@@ -1,6 +1,7 @@
 import requests
 import os
 import json
+import Token
 
 
 class VkAgent:
@@ -10,7 +11,7 @@ class VkAgent:
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
 
     @staticmethod
-    def __file_path(base_path, path):
+    def __folder_creation(base_path, path):
         """
         Создание вложенной папки для директории base_path
         """
@@ -19,45 +20,47 @@ class VkAgent:
             os.mkdir(file_path)
         return file_path
 
+    @staticmethod
+    def __path_normalizer(name_path):
+        """Удаление и замена запрещенных символов в имени папки"""
+        symbol_no = rf"""*:'"%!@?$/\\|&<>+"""
+        name = '_'.join(name_path.split()).strip(symbol_no)
+        for s in symbol_no:
+            if s in name:
+                name = name.replace(s, '_')
+        return name
+
     def files_downloader(self, file_dir: str):
         """
         Загрузка фотографий на локальный диск ПК
         file_dir - директория для загрузки файлов в текущей директории
         Вложенные папки создаются по именам альбомов
         """
-        file_path_start = self.__file_path(os.getcwd(), file_dir)
+        file_path_start = self.__folder_creation(os.getcwd(), file_dir)
         dict_foto_info = {}
         for title, value in self.photos_info.items():
-            symbol_not = rf"""*:'"%!@?$/\\|&<>+"""
-            title = '_'.join(title.split()).strip(r".:,/\\_")
-            # Удаляем запрещенные символы из title
-            for s in symbol_not:
-                if s in title:
-                    title = title.replace(s, '_')
-
-            # Создаем директорию в папке file_dir по имени альбома для загрузки файлов
-            file_path = self.__file_path(file_path_start, title)
-
-            # Загрузка фотографий в папку title
-            print(f"\nЗагружаем файлы в директорию {file_path}:")
+            title = self.__path_normalizer(title)
+            file_path = self.__folder_creation(file_path_start, title)
+            print(f"Загружаем файлы в директорию >>> {file_path}:")
             list_value = []
+
             for info in value:
                 file_name = os.path.join(file_path, info['file_name'])
                 response = requests.get(info['url'])
                 print(f"'{info['file_name']}' ")
                 with open(file_name, 'wb') as f:
                     f.write(response.content)
-                # Создаем список значений словаря dict_foto_info
+
                 list_value.append({
                     'file_name': info['file_name'],
                     'size': info['size']
                 })
-            # добавляем значение в словарь по ключю title
+
             dict_foto_info[title] = list_value
 
         # Создание и загрузка итогового json-файла в директорию file_dir
         file_name_json = os.path.join(file_path_start, f"{file_dir}.json")
-        print(f"'{file_dir}.json'")
+        print(f"Загружаем файл '{file_dir}.json' в >>> {file_path_start}")
         with open(file_name_json, 'w', encoding="utf-8") as f:
             json.dump(dict_foto_info, f, indent=2, ensure_ascii=False)
         print("=" * 50)
@@ -111,6 +114,7 @@ class VkAgent:
                     # Создаем словарь типа {количество лайков: количество одинаковых количеств лайков}
                     file_names_count[file_name] = file_names_count.get(file_name, 0) + 1
 
+                    # Добавляем словарь в список photos_info
                     photos_info.append({
                         'file_name': file_name,
                         'date': item['date'],
@@ -120,8 +124,8 @@ class VkAgent:
 
                 # Преобразовываем полученный ранее список photos_info:
                 # добавляем расширение и при необходимости дату к имени файла
+                # на основании данных словаря file_names_count
                 # удаляем дату из словарей
-
                 for photo in photos_info:
                     if file_names_count[photo['file_name']] > 1:
                         photo['file_name'] += f"_{photo['date']}.jpg"
@@ -130,7 +134,6 @@ class VkAgent:
                     del photo['date']
 
                 # создаем глобальный словарь с добавлением ключа по названию альбома
-
                 total_photos_info[album_id['title']] = photos_info
 
         return total_photos_info
@@ -187,22 +190,20 @@ class YaUploader:
 
 
 if __name__ == '__main__':
-    # TOKEN_VK = '958eb5d439726565e9333aa30e50e0f937ee432e927f0dbd541c541887d919a7c56f95c04217915c32008'
-    TOKEN_VK = ''
-    TOKEN_YA = ''
+    # FILE_DIR2 = "Sergryap"
 
     # FILE_DIR1 = "Michel"
-    # FILE_DIR2 = "Sergryap"
-    FILE_DIR3 = "Oksana_Magura"
-    FILE_DIR4 = "Platunova_Nataly"
+    # michel = VkAgent(Token.TOKEN_VK, "552934290")
+    # michel.files_downloader(FILE_DIR1)
+
+    # FILE_DIR3 = "Oksana_Magura"
+    # magur = VkAgent(Token.TOKEN_VK, '9681859')
+    # magur.files_downloader(FILE_DIR3)
+    # magur_load = YaUploader(Token.TOKEN_YA)
+    # magur_load.upload(FILE_DIR3)
+
     FILE_DIR5 = "Lyudmila"
-
-    magur = VkAgent(TOKEN_VK, '9681859')
-    magur.files_downloader(FILE_DIR3)
-    magur_load = YaUploader(TOKEN_YA)
-    magur_load.upload(FILE_DIR3)
-
-    # lyud = VkAgent(TOKEN_VK, '208193971')
+    # lyud = VkAgent(Token.TOKEN_VK, '208193971')
     # lyud.files_downloader(FILE_DIR5)
-    # lupload = YaUploader(TOKEN_YA)
-    # lupload.upload(FILE_DIR5)
+    lupload = YaUploader(Token.TOKEN_YA)
+    lupload.upload(FILE_DIR5)
