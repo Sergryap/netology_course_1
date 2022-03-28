@@ -6,6 +6,12 @@ import os
 import Token
 import main
 
+#Данные для авторизации импортируются из файла Token.py в текущей директории:
+# token_ok = "..."
+# application_id = "..."
+# application_key = "..."
+# application_secret_key = "..."
+# session_secret_key = "..."
 
 class OkAgent:
     url = "https://api.ok.ru/fb.do"

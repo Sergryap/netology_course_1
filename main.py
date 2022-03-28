@@ -202,8 +202,10 @@ if __name__ == '__main__':
     # magur_load = YaUploader(Token.TOKEN_YA)
     # magur_load.upload(FILE_DIR3)
 
-    FILE_DIR5 = "Lyudmila"
-    # lyud = VkAgent(Token.TOKEN_VK, '208193971')
-    # lyud.files_downloader(FILE_DIR5)
-    lupload = YaUploader(Token.TOKEN_YA)
-    lupload.upload(FILE_DIR5)
+    # FILE_DIR5 = "Lyudmila"
+    # # lyud = VkAgent(Token.TOKEN_VK, '208193971')
+    # # lyud.files_downloader(FILE_DIR5)
+    # lupload = YaUploader(Token.TOKEN_YA)
+    # lupload.upload(FILE_DIR5)
+    ok1 = YaUploader(Token.TOKEN_YA)
+    ok1.upload('ok1')
