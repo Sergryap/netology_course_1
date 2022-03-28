@@ -23,7 +23,7 @@ class VkAgent:
     @staticmethod
     def __path_normalizer(name_path):
         """Удаление и замена запрещенных символов в имени папки"""
-        symbol_no = rf"""*:'"%!@?$/\\|&<>+"""
+        symbol_no = rf"""*:'"%!@?$/\\|&<>+.)("""
         name = '_'.join(name_path.split()).strip(symbol_no)
         for s in symbol_no:
             if s in name:
