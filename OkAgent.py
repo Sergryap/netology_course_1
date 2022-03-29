@@ -1,19 +1,20 @@
 import requests
-import json
-from pprint import pprint
-import hashlib
 import os
+import json
 import Token
-import main
+import Ya
+import Agent
+import hashlib
 
-#Данные для авторизации импортируются из файла Token.py в текущей директории:
+
+# Данные для авторизации из файла Token.py в текущей директории:
 # token_ok = "..."
 # application_id = "..."
 # application_key = "..."
 # application_secret_key = "..."
 # session_secret_key = "..."
 
-class OkAgent:
+class OkAgent(Agent.Social):
     url = "https://api.ok.ru/fb.do"
 
     def __init__(self, fid):
@@ -51,16 +52,6 @@ class OkAgent:
         params_delta = {"method": method, "sig": sig, "aid": aid}
         return requests.get(OkAgent.url, params={**self.params, **params_delta}).json()
 
-    @staticmethod
-    def __path_normalizer(name_path):
-        """Удаление и замена запрещенных символов в имени папки"""
-        symbol_no = rf"""*:'"%!@?$/\\|&<>+.)("""
-        name = '_'.join(name_path.split()).strip(symbol_no)
-        for s in symbol_no:
-            if s in name:
-                name = name.replace(s, '_')
-        return name
-
     @property
     def photos_info(self):
         photos_info = {}
@@ -82,64 +73,14 @@ class OkAgent:
                     'url': photo_url,
                     'size': size
                 })
-            photos_info[self.__path_normalizer(album['title'])] = value_photos_info
+            photos_info[self._path_normalizer(album['title'])] = value_photos_info
         return photos_info
 
 
-    @staticmethod
-    def __folder_creation(base_path, path):
-        """
-        Создание вложенной папки для директории base_path
-        """
-        file_path = os.path.join(base_path, path)
-        if not os.path.isdir(file_path):
-            os.mkdir(file_path)
-        return file_path
-
-    def files_downloader(self, file_dir: str):
-        """
-        Загрузка фотографий на локальный диск ПК
-        file_dir - директория для загрузки файлов в текущей директории
-        Вложенные папки создаются по именам альбомов
-        """
-        file_path_start = self.__folder_creation(os.getcwd(), file_dir)
-        dict_foto_info = {}
-        for title, value in self.photos_info.items():
-            file_path = self.__folder_creation(file_path_start, title)
-            print(f"Загружаем файлы в директорию >>> {file_path}:")
-            list_value = []
-
-            for info in value:
-                file_name = os.path.join(file_path, info['file_name'])
-                response = requests.get(info['url'])
-                print(f"'{info['file_name']}' ")
-                with open(file_name, 'wb') as f:
-                    f.write(response.content)
-
-                list_value.append({
-                    'file_name': info['file_name'],
-                    'size': info['size']
-                })
-
-            dict_foto_info[title] = list_value
-
-        # Создание и загрузка итогового json-файла в директорию file_dir
-        file_name_json = os.path.join(file_path_start, f"{file_dir}.json")
-        print(f"Загружаем файл '{file_dir}.json' в >>> {file_path_start}")
-        with open(file_name_json, 'w', encoding="utf-8") as f:
-            json.dump(dict_foto_info, f, indent=2, ensure_ascii=False)
-        print("=" * 50)
-
-
-
-
 if __name__ == '__main__':
-    ok1 = OkAgent("332021380847")
-    # pprint(ok1.photos_get_albums)
-    # print("=" * 100)
-    # pprint(ok1.get_aid)
-    # print("=" * 100)
-    # pprint(ok1.photos_get_photos(aid="432076964335"))
-    # pprint(ok1.photos_info)
-    ok1.files_downloader('ok1')
-
+    FILE_DIR = "ok1"
+    PATH_DIR = os.path.join(os.getcwd(), FILE_DIR)
+    # ok1 = OkAgent("332021380847")
+    # ok1.files_downloader(FILE_DIR)
+    ok1_load = Ya.YaUploader(Token.TOKEN_YA)
+    ok1_load.upload(PATH_DIR)

@@ -3,67 +3,14 @@ import os
 import json
 import Token
 import Ya
+import Agent
 
 
-class VkAgent:
+class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
 
     def __init__(self, token, owner_id):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
-
-    @staticmethod
-    def __folder_creation(base_path, path):
-        """
-        Создание вложенной папки для директории base_path
-        """
-        file_path = os.path.join(base_path, path)
-        if not os.path.isdir(file_path):
-            os.mkdir(file_path)
-        return file_path
-
-    @staticmethod
-    def __path_normalizer(name_path):
-        """Удаление и замена запрещенных символов в имени папки"""
-        symbol_no = rf"""*:'"%!@?$/\\|&<>+.)("""
-        name = '_'.join(name_path.split()).strip(symbol_no)
-        for s in symbol_no:
-            if s in name:
-                name = name.replace(s, '_')
-        return name
-
-    def files_downloader(self, file_dir: str):
-        """
-        Загрузка фотографий на локальный диск ПК
-        file_dir - директория для загрузки файлов в текущей директории
-        Вложенные папки создаются по именам альбомов
-        """
-        file_path_start = self.__folder_creation(os.getcwd(), file_dir)
-        dict_foto_info = {}
-        for title, value in self.photos_info.items():
-            file_path = self.__folder_creation(file_path_start, title)
-            print(f"Загружаем файлы в директорию >>> {file_path}:")
-            list_value = []
-
-            for info in value:
-                file_name = os.path.join(file_path, info['file_name'])
-                response = requests.get(info['url'])
-                print(f"'{info['file_name']}' ")
-                with open(file_name, 'wb') as f:
-                    f.write(response.content)
-
-                list_value.append({
-                    'file_name': info['file_name'],
-                    'size': info['size']
-                })
-
-            dict_foto_info[title] = list_value
-
-        # Создание и загрузка итогового json-файла в директорию file_dir
-        file_name_json = os.path.join(file_path_start, f"{file_dir}.json")
-        print(f"Загружаем файл '{file_dir}.json' в >>> {file_path_start}")
-        with open(file_name_json, 'w', encoding="utf-8") as f:
-            json.dump(dict_foto_info, f, indent=2, ensure_ascii=False)
-        print("=" * 50)
 
     @property
     def albums_id(self):
@@ -78,7 +25,7 @@ class VkAgent:
 
         for item in response['response']['items']:
             albums_id.append({
-                'title': self.__path_normalizer(item['title']),
+                'title': self._path_normalizer(item['title']),
                 'id': item['id']
             })
 
@@ -140,27 +87,26 @@ class VkAgent:
 
 
 if __name__ == '__main__':
-
     FILE_DIR1 = "Michel"
     PATH_DIR1 = os.path.join(os.getcwd(), FILE_DIR1)
     # michel = VkAgent(Token.TOKEN_VK, "552934290")
     # michel.files_downloader(FILE_DIR1)
     michel_load = Ya.YaUploader(Token.TOKEN_YA)
-    michel_load.upload_recursive(PATH_DIR1)
+    michel_load.upload(PATH_DIR1)
 
     # FILE_DIR3 = "Oksana_Magura"
     # PATH_DIR3 = os.path.join(os.getcwd(), FILE_DIR3)
     # magur = VkAgent(Token.TOKEN_VK, '9681859')
     # magur.files_downloader(FILE_DIR3)
     # magur_load = Ya.YaUploader(Token.TOKEN_YA)
-    # magur_load.upload_recursive(PATH_DIR3)
+    # magur_load.upload(PATH_DIR3)
 
     # FILE_DIR5 = "Lyudmila"
     # PATH_DIR5 = os.path.join(os.getcwd(), FILE_DIR5)
     # lyud = VkAgent(Token.TOKEN_VK, '208193971')
     # lyud.files_downloader(FILE_DIR5)
     # lupload = Ya.YaUploader(Token.TOKEN_YA)
-    # lupload.upload_recursive(PATH_DIR5)
+    # lupload.upload(PATH_DIR5)
 
     # path_ok = os.path.join(os.getcwd(), 'Test01')
     # ok1 = Ya.YaUploader(Token.TOKEN_YA)
