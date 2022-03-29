@@ -52,35 +52,50 @@ class OkAgent(Agent.Social):
         params_delta = {"method": method, "sig": sig, "aid": aid}
         return requests.get(OkAgent.url, params={**self.params, **params_delta}).json()
 
+    @staticmethod
+    def __info_photos(info_foto):
+        value_photos_info = []
+        for photo in info_foto['photos']:
+            area = 0
+            for key in photo:
+                if 'pic' in key:
+                    pic = key.strip('pic').split('x')
+                    area_new = int(pic[0]) * int(pic[1])
+                    if area_new > area:
+                        area = area_new
+                        photo_url = photo[key]
+                        size = f'{pic[0]} * {pic[1]}'
+            value_photos_info.append({
+                'file_name': f"id{photo['id']}.jpg",
+                'url': photo_url,
+                'size': size
+            })
+        return value_photos_info
+
     @property
     def photos_info(self):
         photos_info = {}
         for album in self.get_aid:
-            value_photos_info = []
             info = self.photos_get_photos(aid=album['aid'])
-            for photo in info['photos']:
-                area = 0
-                for key in photo:
-                    if 'pic' in key:
-                        pic = key.strip('pic').split('x')
-                        area_new = int(pic[0]) * int(pic[1])
-                        if area_new > area:
-                            area = area_new
-                            photo_url = photo[key]
-                            size = f'{pic[0]} * {pic[1]}'
-                value_photos_info.append({
-                    'file_name': f"id{photo['id']}.jpg",
-                    'url': photo_url,
-                    'size': size
-                })
+            value_photos_info = self.__info_photos(info)
             photos_info[self._path_normalizer(album['title'])] = value_photos_info
+        info = self.photos_get_photos()
+        value_photos_info = self.__info_photos(info)
+        photos_info['Личные_фотографии'] = value_photos_info
         return photos_info
 
 
 if __name__ == '__main__':
     FILE_DIR = "Алексей"
-    PATH_DIR = os.path.join(os.getcwd(), FILE_DIR)
-    # ok1 = OkAgent("332021380847")
-    # ok1.files_downloader(FILE_DIR)
-    ok1_load = Ya.YaUploader(Token.TOKEN_YA)
-    ok1_load.upload(PATH_DIR)
+    ok1 = OkAgent("332021380847")
+    ok1.files_downloader(FILE_DIR)
+    # PATH_DIR = os.path.join(os.getcwd(), FILE_DIR)
+    # ok1_load = Ya.YaUploader(Token.TOKEN_YA)
+    # ok1_load.upload(PATH_DIR)
+
+    # FILE_DIR1 = "Владимир"
+    # ok1 = OkAgent("553931153141")
+    # ok1.files_downloader(FILE_DIR1)
+    # PATH_DIR1 = os.path.join(os.getcwd(), FILE_DIR1)
+    # ok1_load = Ya.YaUploader(Token.TOKEN_YA)
+    # ok1_load.upload(PATH_DIR1)
