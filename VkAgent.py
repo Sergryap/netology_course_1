@@ -89,8 +89,8 @@ class VkAgent(Agent.Social):
 if __name__ == '__main__':
     FILE_DIR1 = "Michel"
     PATH_DIR1 = os.path.join(os.getcwd(), FILE_DIR1)
-    # michel = VkAgent(Token.TOKEN_VK, "552934290")
-    # michel.files_downloader(FILE_DIR1)
+    michel = VkAgent(Token.TOKEN_VK, "552934290")
+    michel.files_downloader(FILE_DIR1)
     michel_load = Ya.YaUploader(Token.TOKEN_YA)
     michel_load.upload(PATH_DIR1)
 

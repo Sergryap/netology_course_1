@@ -78,7 +78,7 @@ class OkAgent(Agent.Social):
 
 
 if __name__ == '__main__':
-    FILE_DIR = "ok1"
+    FILE_DIR = "Алексей"
     PATH_DIR = os.path.join(os.getcwd(), FILE_DIR)
     # ok1 = OkAgent("332021380847")
     # ok1.files_downloader(FILE_DIR)
