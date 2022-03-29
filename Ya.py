@@ -6,7 +6,7 @@ import Token
 class YaUploader:
     """
     Создает объекты-загрузчики содержимого папок с дублированием структуры
-    методом self.upload_recursive(path_start) на яндекс-диск.
+    методом self.upload(path_start) на яндекс-диск.
     Использован метод рекурсивного обхода папок
     """
     URL = 'https://cloud-api.yandex.net/v1/disk/resources'
