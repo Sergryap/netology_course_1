@@ -34,8 +34,9 @@ class VkAgent(Agent.Social):
     @property
     def photos_info(self):
         """
-        Создает список словарей self.photos_info с информацией для загружаемых файлов фотографий
-        для альбомов из self.albums_id
+        Создает словарь типа:
+        {'название альбома':
+        [{'file_name': file_name, 'date': date, 'url': photo_url, 'size': image_resolution}...]
         Метод ВК: photos.get:
 
         """
