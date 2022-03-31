@@ -12,7 +12,6 @@ class VkAgent(Agent.Social):
     def __init__(self, token, owner_id):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
 
-    @property
     def albums_id(self):
         """
         возвращает список словарей, содержащих название и id
@@ -31,7 +30,6 @@ class VkAgent(Agent.Social):
 
         return albums_id
 
-    @property
     def photos_info(self):
         """
         Создает словарь типа:
@@ -42,7 +40,7 @@ class VkAgent(Agent.Social):
         """
         total_photos_info = {}
         photos_get_url = self.url + 'photos.get'
-        for album_id in self.albums_id:
+        for album_id in self.albums_id():
             photos_info = []
             file_names_count = {}
             photos_get_params = {'album_id': album_id['id'], 'extended': 1}

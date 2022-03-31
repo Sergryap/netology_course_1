@@ -29,11 +29,11 @@ class Social:
         """
         Загрузка фотографий на локальный диск ПК
         file_dir - директория для загрузки файлов в текущей директории
-        Вложенные папки создаются по именам альбомов
+        Вложенные папки создаются по именам альбомов из self_photos.info()
         """
         file_path_start = self.__folder_creation(os.getcwd(), file_dir)
         dict_foto_info = {}
-        for title, value in self.photos_info.items():
+        for title, value in self.photos_info().items():
             file_path = self.__folder_creation(file_path_start, title)
             print(f"Загружаем файлы в директорию >>> {file_path}:")
             list_value = []
