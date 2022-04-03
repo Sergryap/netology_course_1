@@ -64,7 +64,7 @@ class VkAgent(Agent.Social):
         """
         Создает словарь типа:
         {'название альбома':
-        [{'file_name': file_name, 'date': date, 'url': photo_url, 'size': image_resolution}...]
+        [{'file_name': file_name, 'url': photo_url, 'size': image_resolution}...]
         Метод ВК: photos.get:
 
         """
