@@ -6,6 +6,7 @@ import Ya
 import Agent
 import time
 import random as rnd
+from pprint import pprint
 
 
 class VkAgent(Agent.Social):
@@ -46,12 +47,16 @@ class VkAgent(Agent.Social):
                     image_res = f"{size['height']} * {size['width']}"
                     photo_url = size['url']
             else:
+                flag = False
                 for i in 'wzyx':
                     for size1 in item['sizes']:
                         if size1['type'] == i:
                             image_res = "нет данных"
                             photo_url = size1['url']
+                            flag = True
                             break
+                    if flag:
+                        break
                 break
         return image_res, photo_url
 
@@ -113,16 +118,18 @@ if __name__ == '__main__':
     # michel_load = Ya.YaUploader(Token.TOKEN_YA)
     # michel_load.upload(PATH_DIR1)
 
-    FILE_DIR3 = "Oksana_Magura"
-    PATH_DIR3 = os.path.join(os.getcwd(), FILE_DIR3)
-    magur = VkAgent(Token.TOKEN_VK, '9681859')
-    magur.files_downloader(FILE_DIR3)
+    # FILE_DIR3 = "Oksana_Magura"
+    # PATH_DIR3 = os.path.join(os.getcwd(), FILE_DIR3)
+    # magur = VkAgent(Token.TOKEN_VK, '9681859')
+    # pprint(magur.photos_info())
+    # magur.files_downloader(FILE_DIR3)
     # magur_load = Ya.YaUploader(Token.TOKEN_YA)
     # magur_load.upload(PATH_DIR3)
 
-    # FILE_DIR5 = "Lyudmila"
-    # PATH_DIR5 = os.path.join(os.getcwd(), FILE_DIR5)
-    # lyud = VkAgent(Token.TOKEN_VK, '208193971')
+    FILE_DIR5 = "Lyudmila"
+    PATH_DIR5 = os.path.join(os.getcwd(), FILE_DIR5)
+    lyud = VkAgent(Token.TOKEN_VK, '208193971')
+    # pprint(lyud.photos_info())
     # lyud.files_downloader(FILE_DIR5)
     # lupload = Ya.YaUploader(Token.TOKEN_YA)
     # lupload.upload(PATH_DIR5)
@@ -130,6 +137,7 @@ if __name__ == '__main__':
     # FILE_DIR6 = "Nataly_Ryapina"
     # PATH_DIR6 = os.path.join(os.getcwd(), FILE_DIR6)
     # nataly = VkAgent(Token.TOKEN_VK, "3627604")
+    # pprint(nataly.photos_info())
     # nataly.files_downloader(FILE_DIR6)
     # michel_load = Ya.YaUploader(Token.TOKEN_YA)
     # michel_load.upload(PATH_DIR1)
