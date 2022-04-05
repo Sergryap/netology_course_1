@@ -38,7 +38,7 @@ class Social:
         for title, value in self.photos_info().items():
             file_path = self.__folder_creation(file_path_start, title)
             print(f"Загружаем файлы в директорию >>> {file_path}:")
-            time.sleep(rnd.randint(1, 3))
+            time.sleep(rnd.randint(1, 5))
             list_value = []
 
             for info in value:

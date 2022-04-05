@@ -15,7 +15,7 @@ class VkAgent(Agent.Social):
     def __init__(self, token, owner_id):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
 
-    def albums_id(self):
+    def __albums_id(self):
         """
         Cоздает список словарей, содержащих название и id
         альбомы пользователя
@@ -70,9 +70,9 @@ class VkAgent(Agent.Social):
         """
         total_photos_info = {}
         photos_get_url = self.url + 'photos.get'
-        for album_id in self.albums_id():
+        for album_id in self.__albums_id():
             print(f"Получаем данные из альбома: {album_id['title']}")
-            time.sleep(rnd.randint(1, 3))
+            time.sleep(rnd.randint(1, 5))
             photos_info = []
             file_names_count = {}
             photos_get_params = {'album_id': album_id['id'], 'extended': 1}
@@ -110,38 +110,22 @@ class VkAgent(Agent.Social):
 
 
 if __name__ == '__main__':
-    # FILE_DIR1 = "Michel"
-    # PATH_DIR1 = os.path.join(os.getcwd(), FILE_DIR1)
-    # michel = VkAgent(Token.TOKEN_VK, "552934290")
-    # pprint(michel.photos_info())
-    # michel.files_downloader(FILE_DIR1)
-    # michel_load = Ya.YaUploader(Token.TOKEN_YA)
-    # michel_load.upload(PATH_DIR1)
-
-    # FILE_DIR3 = "Oksana_Magura"
-    # PATH_DIR3 = os.path.join(os.getcwd(), FILE_DIR3)
+    # FILE_DIR1 = "Oksana_Magura"
     # magur = VkAgent(Token.TOKEN_VK, '9681859')
-    # pprint(magur.photos_info())
-    # magur.files_downloader(FILE_DIR3)
+    # magur.files_downloader(FILE_DIR1)
+    # # PATH_DIR1 = os.path.join(os.getcwd(), FILE_DIR1)
     # magur_load = Ya.YaUploader(Token.TOKEN_YA)
-    # magur_load.upload(PATH_DIR3)
+    # magur_load.upload(PATH_DIR1)
+    # pprint(magur.photos_info())
 
-    FILE_DIR5 = "Lyudmila"
-    PATH_DIR5 = os.path.join(os.getcwd(), FILE_DIR5)
-    lyud = VkAgent(Token.TOKEN_VK, '208193971')
-    # pprint(lyud.photos_info())
-    # lyud.files_downloader(FILE_DIR5)
-    # lupload = Ya.YaUploader(Token.TOKEN_YA)
-    # lupload.upload(PATH_DIR5)
+    # FILE_DIR2 = "Oksa_Studio"
+    # oksa_studio = VkAgent(Token.TOKEN_VK, '-142029999')
+    # # pprint(oksa_studio.photos_info())
+    # oksa_studio.files_downloader(FILE_DIR2)
 
-    # FILE_DIR6 = "Nataly_Ryapina"
-    # PATH_DIR6 = os.path.join(os.getcwd(), FILE_DIR6)
-    # nataly = VkAgent(Token.TOKEN_VK, "3627604")
-    # pprint(nataly.photos_info())
-    # nataly.files_downloader(FILE_DIR6)
-    # michel_load = Ya.YaUploader(Token.TOKEN_YA)
-    # michel_load.upload(PATH_DIR1)
+    FILE_DIR3 = "Netology"
+    netology = VkAgent(Token.TOKEN_VK, '-30159897')
+    # pprint(oksa_studio.photos_info())
+    netology.files_downloader(FILE_DIR3)
 
-    # path_ok = os.path.join(os.getcwd(), 'Test01')
-    # ok1 = Ya.YaUploader(Token.TOKEN_YA)
-    # ok1.upload_recursive(path_ok)
+

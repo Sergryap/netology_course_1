@@ -26,21 +26,21 @@ class OkAgent(Agent.Social):
             "access_token": Token.token_ok
         }
 
-    def photos_get_albums(self):
+    def __photos_get_albums(self):
         method = "photos.getAlbums"
         row = f"application_key={Token.application_key}fid={self.fid}format=jsonmethod={method}{Token.session_secret_key}"
         sig = hashlib.md5(row.encode('utf-8')).hexdigest()
         params_delta = {"method": method, "sig": sig}
         return requests.get(OkAgent.url, params={**self.params, **params_delta}).json()
 
-    def get_aid(self):
+    def __get_aid(self):
         """Возвращает список aid альбомов пользователя"""
         aids = []
-        for value in self.photos_get_albums()['albums']:
+        for value in self.__photos_get_albums()['albums']:
             aids.append({'aid': value['aid'], 'title': value['title']})
         return aids
 
-    def photos_get_photos(self, aid=None):
+    def __photos_get_photos(self, aid=None):
         method = "photos.getPhotos"
         if aid:
             row = f"aid={aid}application_key={Token.application_key}fid={self.fid}format=jsonmethod={method}{Token.session_secret_key}"
@@ -72,11 +72,11 @@ class OkAgent(Agent.Social):
 
     def photos_info(self):
         photos_info = {}
-        for album in self.get_aid():
-            info = self.photos_get_photos(aid=album['aid'])
+        for album in self.__get_aid():
+            info = self.__photos_get_photos(aid=album['aid'])
             value_photos_info = self.__info_photos(info)
             photos_info[self._path_normalizer(album['title'])] = value_photos_info
-        info = self.photos_get_photos()
+        info = self.__photos_get_photos()
         value_photos_info = self.__info_photos(info)
         photos_info['Личные_фотографии'] = value_photos_info
         return photos_info
