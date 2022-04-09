@@ -13,7 +13,7 @@ from pprint import pprint
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
 
-    def __init__(self, token, owner_id, folder_name):
+    def __init__(self, folder_name, owner_id='7352307', token=Token.TOKEN_VK):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
         self.owner_id = owner_id
         self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
@@ -32,16 +32,10 @@ class VkAgent(Agent.Social):
                 and 'ресниц' in value['name'].lower()
                 )
 
-    @staticmethod
-    def __create_value_group(item: dict):
-        """Создание значения в для ключа item['id'] в словаре группы"""
-        return {'screen_name': item['screen_name'], 'name': item['name']}
-
-    def group_search(self, q: str, count=None):
+    def group_search(self, q: str):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
-        :param count: минимальное количество участников в группе
         :return: словарь с ключами по id групп, значения словарь с названиями группы
         """
         group_search = {}
@@ -53,10 +47,12 @@ class VkAgent(Agent.Social):
                 response = requests.get(group_url, params={**self.params, **params_delta}).json()
                 for item in response['response']['items']:
                     print(item['id'])
-                    if count and self.verify_group(item) and self.__get_offset(item['id'])[1] >= count:
-                        group_search[item['id']] = self.__create_value_group(item)
-                    elif self.verify_group(item):
-                        group_search[item['id']] = self.__create_value_group(item)
+                    if self.verify_group(item):
+                        group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
+        # Добавляем количество участников по ключу count
+        for group in group_search:
+            print(f'+count: id{group}')
+            group_search[group]['count'] = self.__get_offset(group)[1]
 
         group_result_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
         with open(group_result_json, 'w', encoding="utf-8") as f:
@@ -67,7 +63,7 @@ class VkAgent(Agent.Social):
         """
         Определение количества шагов для анализа группы, числа участников
         :param group_id: идентификатор группы
-        :return: (количество шагов, число участников)
+        :return: количество шагов, количество участников
         """
         offset_url = self.url + 'groups.getMembers'
         params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': 0, 'fields': 'last_seen'}
@@ -81,20 +77,23 @@ class VkAgent(Agent.Social):
     def __get_users(self, group_id, month):
         """
         Отбор id подписчиков группы в список
-        group_id: id группы
+        :param group_id: id группы
+        :param month: количество месяцев с последнего посещения
         return: список участников группы
         """
         offset = 0
         good_id_list = []
         max_offset = self.__get_offset(group_id)[0]
+        print(f'max_offset={max_offset}')
         get_users_url = self.url + 'groups.getMembers'
         while offset <= max_offset:
+            print(f'offset={offset}')
             params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': offset, 'fields': 'last_seen'}
             response = requests.get(get_users_url, params={**self.params, **params_delta}).json()
             offset += 1
             for item in response['response']['items']:
                 try:
-                    if item['last_seen']['time'] >= round(time.time()) - round(month * 30.4 * 86400):
+                    if item['last_seen']['time'] >= round(time.time()) - round(month * 30.42 * 86400):
                         good_id_list.append(item['id'])
                 except KeyError:
                     continue
@@ -271,7 +270,6 @@ if __name__ == '__main__':
     # # pprint(oksana.group_search('наращивание ресниц'))
     # oksana.get_users(3)
 
-    company1 = VkAgent(Token.TOKEN_VK, 448564047, folder_name='ads_3')
+    company1 = VkAgent(folder_name='ads_4')
     # company1.group_search('наращивание ресниц')
-    company1.get_users(count=4, month=3)
-    # company1.get_users(2)
+    company1.get_users(count=3, month=3)
