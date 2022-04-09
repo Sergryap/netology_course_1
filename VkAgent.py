@@ -1,5 +1,6 @@
 import requests
 import os
+import re
 import json
 import Token
 import Ya
@@ -19,19 +20,22 @@ class VkAgent(Agent.Social):
 
     @staticmethod
     def verify_group(value: dict):
-        verify1 = bool('Обучение' in value['name']
-                       or 'Материалы' in value['name']
-                       or 'материалы' in value['name']
-                       or 'материалов для' in value['name']
-                       or 'всё для' in value['name']
-                       or 'Всё для' in value['name']
-                       or 'все для' in value['name']
-                       or 'Все для' in value['name']
-                       or 'Бесплатно' in value['name']
-                       or 'бесплатно' in value['name']
-                       )
-        verify2 = bool('ресниц' not in value['name'] and 'Ресниц' not in value['name'])
-        return verify1 or verify2
+        """
+        Условие включения группы в базу
+        """
+        return ('обучение' not in value['name'].lower()
+                and 'материалы' not in value['name'].lower()
+                and 'материалов' not in value['name'].lower()
+                and 'всё для' not in value['name'].lower()
+                and 'все для' not in value['name'].lower()
+                and 'бесплатно' not in value['name'].lower()
+                and 'ресниц' in value['name'].lower()
+                )
+
+    @staticmethod
+    def __create_value_group(item: dict):
+        """Создание значения в для ключа item['id'] в словаре группы"""
+        return {'screen_name': item['screen_name'], 'name': item['name']}
 
     def group_search(self, q: str, count=None):
         """
@@ -44,22 +48,16 @@ class VkAgent(Agent.Social):
         group_url = self.url + 'groups.search'
         for soc in ['group', 'page', 'event']:
             for offset in range(100):
-                params_delta = {'q': q, 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6, 'offset': offset}
+                params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
+                                'offset': offset}
                 response = requests.get(group_url, params={**self.params, **params_delta}).json()
                 for item in response['response']['items']:
                     print(item['id'])
-                    if count:
-                        if not self.verify_group(item) and self.__get_offset(item['id'])[1] >= count:
-                            group_search[item['id']] = {
-                                'screen_name': item['screen_name'],
-                                'name': item['name']
-                            }
-                    else:
-                        if not self.verify_group(item):
-                            group_search[item['id']] = {
-                                'screen_name': item['screen_name'],
-                                'name': item['name']
-                            }
+                    if count and self.verify_group(item) and self.__get_offset(item['id'])[1] >= count:
+                        group_search[item['id']] = self.__create_value_group(item)
+                    elif self.verify_group(item):
+                        group_search[item['id']] = self.__create_value_group(item)
+
         group_result_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
         with open(group_result_json, 'w', encoding="utf-8") as f:
             json.dump(group_search, f, indent=2, ensure_ascii=False)
@@ -80,11 +78,11 @@ class VkAgent(Agent.Social):
             count = -1
         return count // 1000, count
 
-    def __get_users(self, group_id):
+    def __get_users(self, group_id, month):
         """
         Отбор id подписчиков группы в список
-        :param group_id:
-        :return:
+        group_id: id группы
+        return: список участников группы
         """
         offset = 0
         good_id_list = []
@@ -96,17 +94,18 @@ class VkAgent(Agent.Social):
             offset += 1
             for item in response['response']['items']:
                 try:
-                    if item['last_seen']['time'] >= 1617874252:
+                    if item['last_seen']['time'] >= round(time.time()) - round(month * 30.4 * 86400):
                         good_id_list.append(item['id'])
                 except KeyError:
                     continue
         return good_id_list
 
-    def get_users(self, count: int):
+    def get_users(self, count=3, month=6):
         """
         Создание списка id подписчиков групп из файла с id групп
         Подписчики состоят не менее чем в количестве count группах
-        :param count: количество групп в которых состоит подписчик
+        :param count: минимальное количество групп в которых состоит подписчик
+        :param month: количество месяцев последней активности пользователя
         Результат записывается в файл, готовый к импорту в РК VK
         """
         group_search_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
@@ -115,7 +114,7 @@ class VkAgent(Agent.Social):
         all_users = []
         for group in group_list:
             print(group)
-            users = self.__get_users(group)
+            users = self.__get_users(group, month)
             all_users.extend(users)
 
         count_group = {}
@@ -125,7 +124,8 @@ class VkAgent(Agent.Social):
         for user, value in count_group.items():
             if value >= count:
                 all_users.append(user)
-        users_file = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_users_{count}_groups.txt")
+        users_file = os.path.join(self.path_ads,
+                                  f"{os.path.split(self.path_ads)[1]}_users_{count}_groups_{month}_month.txt")
         with open(users_file, 'w', encoding="utf-8") as f:
             for item in all_users:
                 f.write(f'{item}\n')
@@ -271,7 +271,7 @@ if __name__ == '__main__':
     # # pprint(oksana.group_search('наращивание ресниц'))
     # oksana.get_users(3)
 
-    company1 = VkAgent(Token.TOKEN_VK, 448564047, folder_name='ads_2')
-    company1.group_search('наращивание ресниц')
-    company1.get_users(3)
-    company1.get_users(2)
+    company1 = VkAgent(Token.TOKEN_VK, 448564047, folder_name='ads_3')
+    # company1.group_search('наращивание ресниц')
+    company1.get_users(count=4, month=3)
+    # company1.get_users(2)
