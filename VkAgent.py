@@ -95,12 +95,18 @@ class VkAgent(Agent.Social):
             params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': offset, 'fields': 'last_seen'}
             response = requests.get(get_users_url, params={**self.params, **params_delta}).json()
             offset += 1
-            for item in response['response']['items']:
-                try:
+            if 'response' in response:
+                for item in response['response']['items']:
                     if item['last_seen']['time'] >= round(time.time()) - round(month * 30.42 * 86400):
                         good_id_list.append(item['id'])
-                except KeyError:
-                    continue
+
+            # for item in response['response']['items']:
+            #     try:
+            #         if item['last_seen']['time'] >= round(time.time()) - round(month * 30.42 * 86400):
+            #             good_id_list.append(item['id'])
+            #     except KeyError:
+            #         continue
+
         return good_id_list
 
     def get_users(self, count=3, month=6):
@@ -172,8 +178,8 @@ class VkAgent(Agent.Social):
         for user in users_list:
             print(f'{count}/{count_end}: id{user.strip()}')
             users_groups[user.strip()] = self.get_user_groups(user.strip())
-            if not users_groups[user.strip()]:
-                del users_groups[user.strip()]
+            # if not users_groups[user.strip()]:
+            #     del users_groups[user.strip()]
             count += 1
 
         path_users_analise = self._folder_creation(self.path_ads, 'users_analise')
@@ -327,6 +333,6 @@ if __name__ == '__main__':
     company1 = VkAgent(folder_name='ads_4')
     # company1.group_search('наращивание ресниц')
     # company1.get_users(count=3, month=3)
-    # company1.get_users_groups('ads_4_users_3_groups_4_month.txt')
-    company1.groups_relevant()
+    company1.get_users_groups('ads_4_users_3_groups_3_month.txt')
+    # company1.groups_relevant()
     # print(company1.get_user_groups('140052354'))

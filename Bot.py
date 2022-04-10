@@ -89,8 +89,10 @@ class Botovod(VkAgent.VkAgent):
             for group in groups:
                 groups_count[group] = groups_count.get(group, 0) + 1
         for group, i in groups_count.copy().items():
-            if i < count:
+            if i > count or i < 10:
                 del groups_count[group]
+            # else:
+            #     groups_count[group] = {'entry': i, 'count': self._get_offset(group)[1]}
 
         file_groups_count = os.path.join(self.path_users_analise,
                                          f"{os.path.split(self.path_ads)[1]}_groups_count.json")
@@ -118,11 +120,11 @@ class Botovod(VkAgent.VkAgent):
                 if group in count_groups:
                     count += 1
             if count >= count_entry:
-                print(count)
+                print(count, len(groups), user)
                 bot_users.append(user)
 
         file_bot = os.path.join(self.path_users_analise,
-                                     f"{os.path.split(self.path_ads)[1]}_bot_users.txt")
+                                f"{os.path.split(self.path_ads)[1]}_bot_users.txt")
         with open(file_bot, 'w', encoding="utf-8") as f:
             for user in bot_users:
                 f.write(f'{user}\n')
@@ -132,5 +134,5 @@ if __name__ == '__main__':
     b1 = Botovod(folder_name='ads_4')
     # b1.get_list_relevant()
     # b1.exclusion_relevant_groups('ads_4_users_3_groups_4_month.json')
-    # b1.groups_count('ads_4_users_3_groups_4_month.json')
-    b1.get_bot_list(count_entry=10)
+    # b1.groups_count('ads_4_users_3_groups_4_month.json', count=100)
+    b1.get_bot_list(count_entry=200)
