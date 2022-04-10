@@ -129,6 +129,56 @@ class VkAgent(Agent.Social):
             for item in all_users:
                 f.write(f'{item}\n')
 
+    def get_user_groups(self, user_id):
+        """
+        Создает списк групп, в которые входит пользователь user_id
+        :return: обозначенный список
+        """
+        user_groups_url = self.url + 'groups.get'
+        params_delta = {'user_id': user_id, 'offset': 0}
+        print(f'offset=0')
+        response = requests.get(user_groups_url, params={**self.params, **params_delta}).json()
+        if 'response' in response:
+            offset = 1
+            max_offset = response['response']['count'] // 1000
+            user_groups = []
+            user_groups.extend(response['response']['items'])
+            while offset <= max_offset:
+                print(f'offset={offset}')
+                params_delta = {'user_id': user_id, 'offset': offset}
+                response = requests.get(user_groups_url, params={**self.params, **params_delta}).json()
+                user_groups.extend(response['response']['items'])
+                offset += 1
+            return user_groups
+
+    def get_users_groups(self, file_user_list: str):
+        """
+        Создает словарь: {ключ - id пользователя,
+        значение - список из групп, в которые входит пользователь
+        :param file_user_list: файл со списком id пользователей в дирректрии self.path_ads
+        :return: словарь
+        """
+        users_groups = {}
+        with open(os.path.join(self.path_ads, file_user_list), encoding="utf-8") as f:
+            users_list = f.readlines()
+        print('Получаем данные:')
+        # time.sleep(0.1)
+        count = 1
+        count_end = len(users_list)
+        for user in users_list:
+            print(f'{count}/{count_end}: id{user.strip()}')
+            users_groups[user.strip()] = self.get_user_groups(user.strip())
+            if not users_groups[user.strip()]:
+                del users_groups[user.strip()]
+            count += 1
+
+        path_users_analise = self._folder_creation(self.path_ads, 'users_analise')
+        users_groups_json = os.path.join(path_users_analise,
+                                         f"{file_user_list.split('.')[0]}.json")
+        with open(users_groups_json, 'w', encoding="utf-8") as f:
+            json.dump(users_groups, f, indent=2, ensure_ascii=False)
+        return users_groups
+
     def friends_info(self):
         """Метод friends.get VK"""
         friends_info = {}
@@ -272,4 +322,6 @@ if __name__ == '__main__':
 
     company1 = VkAgent(folder_name='ads_4')
     # company1.group_search('наращивание ресниц')
-    company1.get_users(count=3, month=3)
+    # company1.get_users(count=3, month=3)
+    company1.get_users_groups('ads_4_users_3_groups_4_month.txt')
+    # print(company1.get_user_groups('140052354'))
