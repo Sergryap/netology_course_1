@@ -1,6 +1,5 @@
 import requests
 import os
-import re
 import json
 import Token
 import Ya
@@ -16,6 +15,7 @@ class VkAgent(Agent.Social):
     def __init__(self, folder_name, owner_id='7352307', token=Token.TOKEN_VK):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
         self.owner_id = owner_id
+        self.folder_name = folder_name
         self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
 
     @staticmethod
@@ -32,11 +32,13 @@ class VkAgent(Agent.Social):
                 and 'ресниц' in value['name'].lower()
                 )
 
-    def group_search(self, q: str):
+    def group_search(self, q: str, suffix='groups', verify=True):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
-        :return: словарь с ключами по id групп, значения словарь с названиями группы
+        :param suffix: суффикс для создаваемого итогового файла
+        :param verify: указывает на необходимость проверки по verify_group
+        :return: словарь с ключами по id групп, значения словарь с названиями группы и числом участников
         """
         group_search = {}
         group_url = self.url + 'groups.search'
@@ -47,14 +49,16 @@ class VkAgent(Agent.Social):
                 response = requests.get(group_url, params={**self.params, **params_delta}).json()
                 for item in response['response']['items']:
                     print(item['id'])
-                    if self.verify_group(item):
+                    if verify and self.verify_group(item):
+                        group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
+                    elif not verify:
                         group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
         # Добавляем количество участников по ключу count
         for group in group_search:
             print(f'+count: id{group}')
             group_search[group]['count'] = self.__get_offset(group)[1]
 
-        group_result_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
+        group_result_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_{suffix}.json")
         with open(group_result_json, 'w', encoding="utf-8") as f:
             json.dump(group_search, f, indent=2, ensure_ascii=False)
         return group_search
@@ -156,7 +160,7 @@ class VkAgent(Agent.Social):
         Создает словарь: {ключ - id пользователя,
         значение - список из групп, в которые входит пользователь
         :param file_user_list: файл со списком id пользователей в дирректрии self.path_ads
-        :return: словарь
+        :return: обозначенный выше словарь
         """
         users_groups = {}
         with open(os.path.join(self.path_ads, file_user_list), encoding="utf-8") as f:
@@ -323,5 +327,6 @@ if __name__ == '__main__':
     company1 = VkAgent(folder_name='ads_4')
     # company1.group_search('наращивание ресниц')
     # company1.get_users(count=3, month=3)
-    company1.get_users_groups('ads_4_users_3_groups_4_month.txt')
+    # company1.get_users_groups('ads_4_users_3_groups_4_month.txt')
+    company1.groups_relevant()
     # print(company1.get_user_groups('140052354'))
