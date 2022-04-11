@@ -12,16 +12,18 @@ from pprint import pprint
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
 
-    def __init__(self, folder_name, owner_id='7352307', token=Token.TOKEN_VK):
+    def __init__(self, folder_name, owner_id=Token.owner_id, token=Token.TOKEN_VK):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
         self.owner_id = owner_id
         self.folder_name = folder_name
         self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
+        self.path_analise = self._folder_creation(self.path_ads, 'user_analise')
+        self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
 
     @staticmethod
     def verify_group(value: dict):
         """
-        Условие включения группы в базу
+        Условие включения группы в отбор
         """
         return ('обучение' not in value['name'].lower()
                 and 'материалы' not in value['name'].lower()
@@ -32,12 +34,13 @@ class VkAgent(Agent.Social):
                 and 'ресниц' in value['name'].lower()
                 )
 
-    def group_search(self, q: str, suffix='groups', verify=True):
+    def group_search(self, q: str, suffix='groups', verify=True, relevant=False):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
         :param suffix: суффикс для создаваемого итогового файла
-        :param verify: указывает на необходимость проверки по verify_group
+        :param verify: указывает на необходимость проверки по условию verify_group
+        :param relevant: указывается True при поиске релевантных групп
         :return: словарь с ключами по id групп, значения словарь с названиями группы и числом участников
         """
         group_search = {}
@@ -57,17 +60,17 @@ class VkAgent(Agent.Social):
         for group in group_search:
             print(f'+count: id{group}')
             group_search[group]['count'] = self.__get_offset(group)[1]
-
-        group_result_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_{suffix}.json")
+        path_result = self.path_relevant if relevant else self.path_ads
+        group_result_json = os.path.join(path_result, f"{os.path.split(self.path_ads)[1]}_{suffix}.json")
         with open(group_result_json, 'w', encoding="utf-8") as f:
             json.dump(group_search, f, indent=2, ensure_ascii=False)
         return group_search
 
     def __get_offset(self, group_id):
         """
-        Определение количества шагов для анализа группы, числа участников
+        Определение количества шагов для анализа группы и числа участников
         :param group_id: идентификатор группы
-        :return: количество шагов, количество участников
+        :return: количество шагов (offset), количество участников в группе
         """
         offset_url = self.url + 'groups.getMembers'
         params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': 0, 'fields': 'last_seen'}
@@ -78,11 +81,12 @@ class VkAgent(Agent.Social):
             count = -1
         return count // 1000, count
 
-    def __get_users(self, group_id, month):
+    def __get_users(self, group_id, month, sex, city):
         """
-        Отбор id подписчиков группы в список
-        :param group_id: id группы
-        :param month: количество месяцев с последнего посещения
+        Создание списка из id подписчиков группы
+        :param group_id: id группы, у которой отбираем подписчиков
+        :param month: количество месяцев с последнего посещения участника группы
+        :param sex: пол участника группы для отбора в список
         return: список участников группы
         """
         offset = 0
@@ -92,57 +96,64 @@ class VkAgent(Agent.Social):
         get_users_url = self.url + 'groups.getMembers'
         while offset <= max_offset:
             print(f'offset={offset}')
-            params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': offset, 'fields': 'last_seen'}
+            params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': offset, 'fields': 'last_seen,sex,city'}
             response = requests.get(get_users_url, params={**self.params, **params_delta}).json()
+            # pprint(response)
             offset += 1
             if 'response' in response:
                 for item in response['response']['items']:
-                    if item['last_seen']['time'] >= round(time.time()) - round(month * 30.42 * 86400):
-                        good_id_list.append(item['id'])
-
-            # for item in response['response']['items']:
-            #     try:
-            #         if item['last_seen']['time'] >= round(time.time()) - round(month * 30.42 * 86400):
-            #             good_id_list.append(item['id'])
-            #     except KeyError:
-            #         continue
+                    time_start = round(time.time()) - round(month * 30.42 * 86400)
+                    if 'last_seen' in item and item['last_seen']['time'] >= time_start and item['sex'] == sex:
+                        if 'city' in item and item['city']['id'] == city:
+                            good_id_list.append(item['id'])
 
         return good_id_list
 
-    def get_users(self, count=3, month=6):
+    def get_users(self, count=2, month=4, sex=1, city=110):
         """
-        Создание списка id подписчиков групп из файла с id групп
+        Создание списка из id подписчиков групп из файла с id групп
         Подписчики состоят не менее чем в количестве count группах
         :param count: минимальное количество групп в которых состоит подписчик
-        :param month: количество месяцев последней активности пользователя
+        :param month: активностm пользователя не менее месяцев назад
+        :param sex: пол подписчика (по умолчанию жен)
+        :param city: идентификатор города пользователя
         Результат записывается в файл, готовый к импорту в РК VK
         """
         group_search_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
         with open(group_search_json, encoding="utf-8") as f:
-            group_list = json.load(f).keys()
-        all_users = []
-        for group in group_list:
-            print(group)
-            users = self.__get_users(group, month)
-            all_users.extend(users)
+            group_list = json.load(f)
 
-        count_group = {}
-        for user in all_users:
-            count_group[user] = count_group.get(user, 0) + 1
+        # формируем общий список пользователей, входящих в группы group_list
         all_users = []
-        for user, value in count_group.items():
+        len_group = len(group_list)
+        count_i = 1
+        for group in group_list:
+            print(f'id{group}_{count_i}/{len_group}')
+            users = self.__get_users(group, month=month, sex=sex, city=city)
+            all_users.extend(users)
+            count_i += 1
+
+        # считаем количество подписок каждого пользователя на группы из group_lilst
+        count_groups = {}
+        for user in all_users:
+            count_groups[user] = count_groups.get(user, 0) + 1
+        all_users = []
+        for user, value in count_groups.items():
             if value >= count:
                 all_users.append(user)
+        # записываем полученные данные в файл
+        male = 'female' if sex == 1 else 'male'
         users_file = os.path.join(self.path_ads,
-                                  f"{os.path.split(self.path_ads)[1]}_users_{count}_groups_{month}_month.txt")
+                                  f"{os.path.split(self.path_ads)[1]}_users_{count}_groups_{month}_month_{male}_sex_{city}_city.txt")
         with open(users_file, 'w', encoding="utf-8") as f:
             for item in all_users:
                 f.write(f'{item}\n')
 
     def get_user_groups(self, user_id):
         """
-        Создает списк групп, в которые входит пользователь user_id
-        :return: обозначенный список
+        Создает кортеж из списка групп пользователя и количество групп
+        :param user_id: id пользователя, для которого создается кортеж
+        :return: обозначенный кортеж из списка и количества групп
         """
         user_groups_url = self.url + 'groups.get'
         params_delta = {'user_id': user_id, 'offset': 0}
@@ -159,35 +170,43 @@ class VkAgent(Agent.Social):
                 response = requests.get(user_groups_url, params={**self.params, **params_delta}).json()
                 user_groups.extend(response['response']['items'])
                 offset += 1
-            return user_groups
+                user_groups = list(set(user_groups))
+            return user_groups, len(user_groups)
+        return "Нет доступа", 0
 
     def get_users_groups(self, file_user_list: str):
         """
-        Создает словарь: {ключ - id пользователя,
-        значение - список из групп, в которые входит пользователь
+        Создает словарь :
+        {'user_id':
+        {'groups': [список из id групп, в которые входит пользователь]
+         'count': количество групп пользователя}
+        ...
+        }
+        Записывает в файлы по 1000 'user_id' в каждом
         :param file_user_list: файл со списком id пользователей в дирректрии self.path_ads
-        :return: обозначенный выше словарь
         """
         users_groups = {}
         with open(os.path.join(self.path_ads, file_user_list), encoding="utf-8") as f:
             users_list = f.readlines()
         print('Получаем данные:')
         # time.sleep(0.1)
-        count = 1
         count_end = len(users_list)
-        for user in users_list:
+        for count, user in enumerate(users_list, start=1):
             print(f'{count}/{count_end}: id{user.strip()}')
-            users_groups[user.strip()] = self.get_user_groups(user.strip())
-            # if not users_groups[user.strip()]:
-            #     del users_groups[user.strip()]
-            count += 1
+            user_groups_info = self.get_user_groups(user.strip())
+            pprint(user_groups_info)
+            users_groups[user.strip()] = {'count': user_groups_info[1],
+                                          'groups': user_groups_info[0]
+                                          }
+            if not users_groups[user.strip()]['count']:
+                del users_groups[user.strip()]
 
-        path_users_analise = self._folder_creation(self.path_ads, 'users_analise')
-        users_groups_json = os.path.join(path_users_analise,
-                                         f"{file_user_list.split('.')[0]}.json")
-        with open(users_groups_json, 'w', encoding="utf-8") as f:
-            json.dump(users_groups, f, indent=2, ensure_ascii=False)
-        return users_groups
+            if count % 1000 == 0 or count == count_end:
+                users_groups_json = os.path.join(self.path_analise,
+                                                 f"{file_user_list.split('.')[0]}_{count}_count.json")
+                with open(users_groups_json, 'w', encoding="utf-8") as f:
+                    json.dump(users_groups, f, indent=4, ensure_ascii=False)
+                users_groups = {}
 
     def friends_info(self):
         """Метод friends.get VK"""
@@ -330,9 +349,14 @@ if __name__ == '__main__':
     # # pprint(oksana.group_search('наращивание ресниц'))
     # oksana.get_users(3)
 
-    company1 = VkAgent(folder_name='ads_4')
+    # company1 = VkAgent(folder_name='ads_4')
     # company1.group_search('наращивание ресниц')
     # company1.get_users(count=3, month=3)
-    company1.get_users_groups('ads_4_users_3_groups_3_month.txt')
+    # company1.get_users_groups('ads_4_users_3_groups_3_month.txt')
     # company1.groups_relevant()
     # print(company1.get_user_groups('140052354'))
+
+    company2 = VkAgent(folder_name='ads_5')
+    # company2.group_search('наращивание ресниц')
+    # company2.get_users(count=2, month=6)
+    company2.get_users_groups('ads_5_users_2_groups_6_month_female_sex_110_city.txt')
