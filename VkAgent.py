@@ -17,8 +17,9 @@ class VkAgent(Agent.Social):
         self.owner_id = owner_id
         self.folder_name = folder_name
         self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
-        self.path_analise = self._folder_creation(self.path_ads, 'user_analise')
+        self.path_analise = self._folder_creation(self.path_ads, 'users_groups')
         self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
+        self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
 
     @staticmethod
     def verify_group(value: dict):
@@ -46,7 +47,7 @@ class VkAgent(Agent.Social):
         group_search = {}
         group_url = self.url + 'groups.search'
         for soc in ['group', 'page', 'event']:
-            for offset in range(100):
+            for offset in range(10):
                 params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
                                 'offset': offset}
                 response = requests.get(group_url, params={**self.params, **params_delta}).json()
@@ -194,7 +195,7 @@ class VkAgent(Agent.Social):
         for count, user in enumerate(users_list, start=1):
             print(f'{count}/{count_end}: id{user.strip()}')
             user_groups_info = self.get_user_groups(user.strip())
-            pprint(user_groups_info)
+            # pprint(user_groups_info)
             users_groups[user.strip()] = {'count': user_groups_info[1],
                                           'groups': user_groups_info[0]
                                           }
@@ -203,10 +204,23 @@ class VkAgent(Agent.Social):
 
             if count % 1000 == 0 or count == count_end:
                 users_groups_json = os.path.join(self.path_analise,
-                                                 f"{file_user_list.split('.')[0]}_{count}_count.json")
+                                                 f"{file_user_list.split('.')[0]}_{count}_groups.json")
                 with open(users_groups_json, 'w', encoding="utf-8") as f:
                     json.dump(users_groups, f, indent=4, ensure_ascii=False)
                 users_groups = {}
+        return self.__union_users_files()
+
+    def __union_users_files(self):
+        gen_file = (os.path.join(self.path_analise, f) for f in os.listdir(self.path_analise))
+        users_groups = {}
+        for file in gen_file:
+            with open(file, encoding="utf-8") as f:
+                group_list = json.load(f)
+                users_groups.update(group_list)
+        users_groups_file = os.path.join(self.path_ads, f'{os.path.split(self.path_ads)[1]}_users_groups.json')
+        with open(users_groups_file, 'w', encoding="utf-8") as f:
+            json.dump(users_groups, f, indent=4, ensure_ascii=False)
+        return users_groups
 
     def friends_info(self):
         """Метод friends.get VK"""
@@ -359,4 +373,4 @@ if __name__ == '__main__':
     company2 = VkAgent(folder_name='ads_5')
     # company2.group_search('наращивание ресниц')
     # company2.get_users(count=2, month=6)
-    company2.get_users_groups('ads_5_users_2_groups_6_month_female_sex_110_city.txt')
+    # company2.get_users_groups('ads_5_users_2_groups_6_month_female_sex_110_city.txt')
