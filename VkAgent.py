@@ -20,6 +20,7 @@ class VkAgent(Agent.Social):
         self.path_analise = self._folder_creation(self.path_ads, 'users_groups')
         self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
         self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
+        self.path_users = self._folder_creation(self.path_ads, 'users')
 
     @staticmethod
     def verify_group(value: dict):
@@ -144,7 +145,7 @@ class VkAgent(Agent.Social):
                 all_users.append(user)
         # записываем полученные данные в файл
         male = 'female' if sex == 1 else 'male'
-        users_file = os.path.join(self.path_ads,
+        users_file = os.path.join(self.path_users,
                                   f"{os.path.split(self.path_ads)[1]}_users_{count}_groups_{month}_month_{male}_sex_{city}_city.txt")
         with open(users_file, 'w', encoding="utf-8") as f:
             for item in all_users:
@@ -187,7 +188,7 @@ class VkAgent(Agent.Social):
         :param file_user_list: файл со списком id пользователей в дирректрии self.path_ads
         """
         users_groups = {}
-        with open(os.path.join(self.path_ads, file_user_list), encoding="utf-8") as f:
+        with open(os.path.join(self.path_users, file_user_list), encoding="utf-8") as f:
             users_list = f.readlines()
         print('Получаем данные:')
         # time.sleep(0.1)
@@ -372,5 +373,5 @@ if __name__ == '__main__':
 
     company2 = VkAgent(folder_name='ads_5')
     # company2.group_search('наращивание ресниц')
-    # company2.get_users(count=2, month=6)
+    company2.get_users(count=2, month=8)
     # company2.get_users_groups('ads_5_users_2_groups_6_month_female_sex_110_city.txt')

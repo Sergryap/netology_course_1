@@ -13,7 +13,7 @@ class Botovod(VkAgent.VkAgent):
 
     def __init__(self, folder_name, owner_id='7352307', token=Token.TOKEN_VK):
         super().__init__(folder_name, owner_id=owner_id, token=token)
-        self.list_relevant = ['брови', 'ламинирование', 'красота', 'мода']
+        self.list_relevant = ['наращивание ресниц', 'брови', 'ламинирование', 'красота', 'мода']
 
     def __groups_relevant(self):
         """
@@ -84,7 +84,7 @@ class Botovod(VkAgent.VkAgent):
             json.dump(new_users_groups, f, indent=3, ensure_ascii=False)
         return new_users_groups
 
-    def groups_count(self, file_users_groups, count=100):
+    def groups_count(self, file_users_groups, count):
         """
         Подсчет количества вхождений нерелевантных групп в группы пользователей
         :param file_users_groups: json файл со словарем:
@@ -109,13 +109,16 @@ class Botovod(VkAgent.VkAgent):
             json.dump(groups_count, f, indent=2, ensure_ascii=False)
         return groups_count
 
-    def get_bot_list(self, stop_gr=5, gr=500):
+    def get_bot_list(self, file, count=500, stop_gr=30, gr=500):
         """
         Создание списка ботов
         :param stop_gr: количество вхождений нерелевантных групп из groups_count
         :param gr: допустимое количество групп у пользователя
+        :param file: файл для groups_count
+        :param count: count для groups_count
         в группы пользователей, при котором пользователь относится к боту
         """
+        self.groups_count(file_users_groups=file, count=count)
         bot_users = []
         file_users = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_not_relevant.json")
         with open(file_users, encoding="utf-8") as f:
@@ -125,16 +128,16 @@ class Botovod(VkAgent.VkAgent):
             count_groups = json.load(f)
 
         for user, groups in all_users.items():
-            count = 0
+            i = 0
             for group in groups['groups']:
                 if group in count_groups:
-                    count += 1
-            if count >= stop_gr or groups['count'] >= gr:
-                print(count, len(groups), user)
+                    i += 1
+            if i >= stop_gr or groups['count'] >= gr:
+                print(i, len(groups), user)
                 bot_users.append(user)
 
         file_bot = os.path.join(self.path_bot,
-                                f"{os.path.split(self.path_ads)[1]}_bot_users.txt")
+                                f"{os.path.split(self.path_ads)[1]}_bot_users_count_{count}_stop_gr_{stop_gr}_gr_{gr}.txt")
         with open(file_bot, 'w', encoding="utf-8") as f:
             for user in bot_users:
                 f.write(f'{user}\n')
@@ -142,6 +145,4 @@ class Botovod(VkAgent.VkAgent):
 
 if __name__ == '__main__':
     b1 = Botovod(folder_name='ads_5')
-    # b1.get_list_relevant()
-    b1.groups_count('ads_5_users_groups.json', count=300)
-    b1.get_bot_list(stop_gr=100, gr=500)
+    b1.get_bot_list('ads_5_users_groups.json', count=800, stop_gr=30, gr=500)
