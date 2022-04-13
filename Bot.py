@@ -11,7 +11,7 @@ from pprint import pprint
 
 class Botovod(VkAgent.VkAgent):
 
-    def __init__(self, folder_name, owner_id='7352307', token=Token.TOKEN_VK):
+    def __init__(self, folder_name, owner_id=Token.token_vk[0][0], token=Token.token_vk[0][1]):
         super().__init__(folder_name, owner_id=owner_id, token=token)
         self.list_relevant = ['наращивание ресниц', 'брови', 'ламинирование', 'красота', 'мода']
 
@@ -144,5 +144,6 @@ class Botovod(VkAgent.VkAgent):
 
 
 if __name__ == '__main__':
-    b1 = Botovod(folder_name='ads_5')
-    b1.get_bot_list('ads_5_users_groups.json', count=800, stop_gr=30, gr=500)
+    b1 = Botovod(folder_name='ads_6')
+    b1.get_list_relevant()
+    b1.get_bot_list('ads_6_users_groups.json', count=800, stop_gr=30, gr=500)

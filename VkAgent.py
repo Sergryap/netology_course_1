@@ -12,7 +12,7 @@ from pprint import pprint
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
 
-    def __init__(self, folder_name, owner_id=Token.owner_id, token=Token.TOKEN_VK):
+    def __init__(self, folder_name, owner_id=Token.token_vk[0][0], token=Token.token_vk[0][1]):
         self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
         self.owner_id = owner_id
         self.folder_name = folder_name
@@ -21,6 +21,39 @@ class VkAgent(Agent.Social):
         self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
         self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
         self.path_users = self._folder_creation(self.path_ads, 'users')
+        self.token = Token.token_vk
+        self.author = 0
+
+    def __change_token(self, *args, **kwargs):
+        print(self.author)
+        print('Замена токена!')
+        # time.sleep(3)
+
+        for key, value in kwargs.items():
+            if key == 'func':
+                func = value
+            if key == 'var':
+                var = value
+
+        self.author += 1
+        if self.author < len(self.token):
+            self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
+                           'owner_id': self.token[self.author][0]}
+            self.owner_id = self.token[self.author][0]
+            return func(*args)
+        elif var:
+            if self.author == len(self.token):
+                self.author = 0
+                self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
+                               'owner_id': self.token[self.author][0]}
+                self.owner_id = self.token[self.author][0]
+            return -1, -1
+        elif self.author == len(self.token):
+            self.author = 0
+            self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
+                           'owner_id': self.token[self.author][0]}
+            self.owner_id = self.token[self.author][0]
+            return func(*args)
 
     @staticmethod
     def verify_group(value: dict):
@@ -48,16 +81,19 @@ class VkAgent(Agent.Social):
         group_search = {}
         group_url = self.url + 'groups.search'
         for soc in ['group', 'page', 'event']:
-            for offset in range(10):
+            for offset in range(100):
                 params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
                                 'offset': offset}
                 response = requests.get(group_url, params={**self.params, **params_delta}).json()
-                for item in response['response']['items']:
-                    print(item['id'])
-                    if verify and self.verify_group(item):
-                        group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
-                    elif not verify:
-                        group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
+                if 'response' in response:
+                    for item in response['response']['items']:
+                        print(item['id'])
+                        if verify and self.verify_group(item):
+                            group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
+                        elif not verify:
+                            group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
+                else:
+                    return self.__change_token(q, suffix, verify, relevant, func=self.group_search, var=False)
         # Добавляем количество участников по ключу count
         for group in group_search:
             print(f'+count: id{group}')
@@ -80,7 +116,7 @@ class VkAgent(Agent.Social):
         if 'response' in response:  # проверка доступности
             count = response['response']['count']
         else:
-            count = -1
+            return self.__change_token(group_id, func=self.__get_offset, var=True)
         return count // 1000, count
 
     def __get_users(self, group_id, month, sex, city):
@@ -100,14 +136,15 @@ class VkAgent(Agent.Social):
             print(f'offset={offset}')
             params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': offset, 'fields': 'last_seen,sex,city'}
             response = requests.get(get_users_url, params={**self.params, **params_delta}).json()
-            # pprint(response)
-            offset += 1
             if 'response' in response:
+                offset += 1
                 for item in response['response']['items']:
                     time_start = round(time.time()) - round(month * 30.42 * 86400)
                     if 'last_seen' in item and item['last_seen']['time'] >= time_start and item['sex'] == sex:
                         if 'city' in item and item['city']['id'] == city:
                             good_id_list.append(item['id'])
+            else:
+                return self.__change_token(group_id, month, sex, city, func=self.__get_users, var=False)
 
         return good_id_list
 
@@ -174,7 +211,7 @@ class VkAgent(Agent.Social):
                 offset += 1
                 user_groups = list(set(user_groups))
             return user_groups, len(user_groups)
-        return "Нет доступа", 0
+        return self.__change_token(user_id, func=self.get_user_groups, var=True)
 
     def get_users_groups(self, file_user_list: str):
         """
@@ -200,7 +237,7 @@ class VkAgent(Agent.Social):
             users_groups[user.strip()] = {'count': user_groups_info[1],
                                           'groups': user_groups_info[0]
                                           }
-            if not users_groups[user.strip()]['count']:
+            if users_groups[user.strip()]['count'] == -1:
                 del users_groups[user.strip()]
 
             if count % 1000 == 0 or count == count_end:
@@ -371,7 +408,7 @@ if __name__ == '__main__':
     # company1.groups_relevant()
     # print(company1.get_user_groups('140052354'))
 
-    company2 = VkAgent(folder_name='ads_5')
+    company2 = VkAgent(folder_name='ads_6')
     # company2.group_search('наращивание ресниц')
-    company2.get_users(count=2, month=8)
-    # company2.get_users_groups('ads_5_users_2_groups_6_month_female_sex_110_city.txt')
+    # company2.get_users(count=2, month=8)
+    company2.get_users_groups('ads_6_users_2_groups_8_month_female_sex_110_city.txt')
