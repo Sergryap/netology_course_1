@@ -24,35 +24,31 @@ class VkAgent(Agent.Social):
         self.token = Token.token_vk
         self.author = 0
 
-    def __change_token(self, *args, **kwargs):
-        print(self.author)
-        print('Замена токена!')
-        # time.sleep(3)
+    def __set_params(self, i=True):
+        self.author = rnd.randint(0, len(self.token) - 1) if i else self.author + 1
+        self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
+                       'owner_id': self.token[self.author][0]}
+        self.owner_id = self.token[self.author][0]
 
+    def __change_token(self, *args, **kwargs):
+        print('Замена токена!')
         for key, value in kwargs.items():
             if key == 'func':
                 func = value
             if key == 'var':
                 var = value
-
-        self.author += 1
-        if self.author < len(self.token):
-            self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
-                           'owner_id': self.token[self.author][0]}
-            self.owner_id = self.token[self.author][0]
+        if self.author < len(self.token) - 1:
+            self.__set_params(i=False)
+            print(f'1_token={self.author}')
             return func(*args)
         elif var:
-            if self.author == len(self.token):
-                self.author = 0
-                self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
-                               'owner_id': self.token[self.author][0]}
-                self.owner_id = self.token[self.author][0]
+            if self.author == len(self.token) - 1:
+                self.__set_params()
+                print(f'2_token={self.author}')
             return -1, -1
-        elif self.author == len(self.token):
-            self.author = 0
-            self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
-                           'owner_id': self.token[self.author][0]}
-            self.owner_id = self.token[self.author][0]
+        elif self.author == len(self.token) - 1:
+            self.__set_params()
+            print(f'3_token={self.author}')
             return func(*args)
 
     @staticmethod
