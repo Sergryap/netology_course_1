@@ -6,29 +6,26 @@ import Ya
 import Agent
 import time
 import random as rnd
-from pprint import pprint
 
 
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
 
-    def __init__(self, folder_name, owner_id=Token.token_vk[0][0], token=Token.token_vk[0][1]):
-        self.params = {'access_token': token, 'v': '5.131', 'owner_id': owner_id}
-        self.owner_id = owner_id
-        self.folder_name = folder_name
-        self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
-        self.path_analise = self._folder_creation(self.path_ads, 'users_groups')
-        self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
-        self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
-        self.path_users = self._folder_creation(self.path_ads, 'users')
+    def __init__(self, folder_name=None, token=Token.token_vk[0][1]):
+        self.params = {'access_token': token, 'v': '5.131'}
         self.token = Token.token_vk
         self.author = 0
+        if folder_name:
+            self.folder_name = folder_name
+            self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
+            self.path_analise = self._folder_creation(self.path_ads, 'users_groups')
+            self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
+            self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
+            self.path_users = self._folder_creation(self.path_ads, 'users')
 
     def __set_params(self, i=True):
         self.author = rnd.randint(0, len(self.token) - 1) if i else self.author + 1
-        self.params = {'access_token': self.token[self.author][1], 'v': '5.131',
-                       'owner_id': self.token[self.author][0]}
-        self.owner_id = self.token[self.author][0]
+        self.params = {'access_token': self.token[self.author][1], 'v': '5.131'}
 
     def __change_token(self, *args, **kwargs):
         print('Замена токена!')
@@ -111,9 +108,20 @@ class VkAgent(Agent.Social):
         response = requests.get(offset_url, params={**self.params, **params_delta}).json()
         if 'response' in response:  # проверка доступности
             count = response['response']['count']
-        else:
-            return self.__change_token(group_id, func=self.__get_offset, var=True)
-        return count // 1000, count
+            return count // 1000, count
+        return self.__change_token(group_id, func=self.__get_offset, var=True)
+
+    def __users_lock(self, user_id):
+        """
+        Получение информации о том закрытый или нет профиль пользователя
+        :return: bool
+        """
+        params_delta = {'user_ids': user_id}
+        users_lock_url = self.url + 'users.get'
+        response = requests.get(users_lock_url, params={**self.params, **params_delta}).json()
+        if 'response' in response:
+            return response['response'][0]['is_closed']
+        return self.__change_token(user_id, func=self.__users_lock)
 
     def __get_users(self, group_id, month, sex, city):
         """
@@ -190,6 +198,8 @@ class VkAgent(Agent.Social):
         :param user_id: id пользователя, для которого создается кортеж
         :return: обозначенный кортеж из списка и количества групп
         """
+        if self.__users_lock(user_id):
+            return -1, -1
         user_groups_url = self.url + 'groups.get'
         params_delta = {'user_id': user_id, 'offset': 0}
         print(f'offset=0')
@@ -256,48 +266,47 @@ class VkAgent(Agent.Social):
             json.dump(users_groups, f, indent=4, ensure_ascii=False)
         return users_groups
 
-    def friends_info(self):
+    def friends_info(self, user_id):
         """Метод friends.get VK"""
         friends_info = {}
         friends_url = self.url + 'friends.get'
-        friends_params = {'user_id': self.owner_id,
+        friends_params = {'user_id': user_id,
                           'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
                           }
         response = requests.get(friends_url, params={**self.params, **friends_params}).json()
-        for item in response['response']['items']:
-            city = country = 'Нет данных'
-            if 'country' in item:
-                country = item['country']['title']
-            if 'city' in item:
-                city = item['city']['title']
-            friends_info[f"id{item['id']}"] = {
-                'first_name': item['first_name'],
-                'last_name': item['last_name'],
-                'avatar_url': item['photo_200_orig'],
-                'country': country,
-                'city': city
-            }
+        if 'response' in [response]:
+            for item in response['response']['items']:
+                city = country = 'Нет данных'
+                if 'country' in item:
+                    country = item['country']['title']
+                if 'city' in item:
+                    city = item['city']['title']
+                friends_info[f"id{item['id']}"] = {
+                    'first_name': item['first_name'],
+                    'last_name': item['last_name'],
+                    'avatar_url': item['photo_200_orig'],
+                    'country': country,
+                    'city': city}
+            return friends_info
+        return self.__change_token(user_id, func=self.friends_info, var=False)
 
-        return friends_info
-        # return response
-
-    def __albums_id(self):
+    def __albums_id(self, owner_id):
         """
         Cоздает список словарей, содержащих название и id
         альбомы пользователя
         """
-        albums_id = []
         photos_getalbums_url = self.url + 'photos.getAlbums'
-        photos_getalbums_params = {'need_system': '1'}
+        photos_getalbums_params = {'owner_id': owner_id, 'need_system': '1'}
         response = requests.get(photos_getalbums_url, params={**self.params, **photos_getalbums_params}).json()
-
-        for item in response['response']['items']:
-            albums_id.append({
-                'title': self._path_normalizer(item['title']),
-                'id': item['id']
-            })
-
-        return albums_id
+        if 'response' in response:
+            albums_id = []
+            for item in response['response']['items']:
+                albums_id.append({
+                    'title': self._path_normalizer(item['title']),
+                    'id': item['id']
+                })
+            return albums_id
+        return self.__change_token(owner_id, func=self.__albums_id, var=False)
 
     @staticmethod
     def __get_items(item: dict):
@@ -326,85 +335,62 @@ class VkAgent(Agent.Social):
                 break
         return image_res, photo_url
 
-    def photos_info(self):
+    def __photos_get(self, owner_id, album_id):
+        """Создает список для метода photos_info"""
+        photos_get_url = self.url + 'photos.get'
+        photos_get_params = {'owner_id': owner_id, 'album_id': album_id, 'extended': 1}
+        response = requests.get(photos_get_url, params={**self.params, **photos_get_params}).json()
+        if 'response' in response:
+            photos_info = []
+            file_names_count = {}
+            for item in response['response']['items']:
+                image_resolution = self.__get_items(item)[0]
+                photo_url = self.__get_items(item)[1]
+                likes = item['likes']['count']
+                file_name = str(likes)
+                # Создаем словарь типа {количество лайков: количество одинаковых количеств лайков}
+                file_names_count[file_name] = file_names_count.get(file_name, 0) + 1
+                # Добавляем словарь в список photos_info
+                photos_info.append({
+                    'file_name': file_name,
+                    'date': item['date'],
+                    'url': photo_url,
+                    'size': image_resolution
+                })
+                # Преобразовываем полученный ранее список photos_info:
+                # добавляем расширение и при необходимости дату к имени файла
+                # на основании данных словаря file_names_count
+                # удаляем дату из словарей
+            for photo in photos_info:
+                if file_names_count[photo['file_name']] > 1:
+                    photo['file_name'] += f"_{photo['date']}.jpg"
+                else:
+                    photo['file_name'] += ".jpg"
+                del photo['date']
+            return photos_info
+        return self.__change_token(owner_id, album_id, func=self.__photos_get, var=False)
+
+    def photos_info(self, owner_id):
         """
         Создает словарь типа:
         {'название альбома':
         [{'file_name': file_name, 'url': photo_url, 'size': image_resolution}...]
         Метод ВК: photos.get:
-
         """
         total_photos_info = {}
-        photos_get_url = self.url + 'photos.get'
-        for album_id in self.__albums_id():
+        for album_id in self.__albums_id(owner_id):
             print(f"Получаем данные из альбома: {album_id['title']}")
             time.sleep(rnd.randint(1, 5))
-            photos_info = []
-            file_names_count = {}
-            photos_get_params = {'album_id': album_id['id'], 'extended': 1}
-            response = requests.get(photos_get_url, params={**self.params, **photos_get_params}).json()
-            if 'response' in response:  # исключаем не доступные альбомы
-                for item in response['response']['items']:
-                    image_resolution = self.__get_items(item)[0]
-                    photo_url = self.__get_items(item)[1]
-                    likes = item['likes']['count']
-                    file_name = str(likes)
-                    # Создаем словарь типа {количество лайков: количество одинаковых количеств лайков}
-                    file_names_count[file_name] = file_names_count.get(file_name, 0) + 1
-                    # Добавляем словарь в список photos_info
-                    photos_info.append({
-                        'file_name': file_name,
-                        'date': item['date'],
-                        'url': photo_url,
-                        'size': image_resolution
-                    })
-                # Преобразовываем полученный ранее список photos_info:
-                # добавляем расширение и при необходимости дату к имени файла
-                # на основании данных словаря file_names_count
-                # удаляем дату из словарей
-                for photo in photos_info:
-                    if file_names_count[photo['file_name']] > 1:
-                        photo['file_name'] += f"_{photo['date']}.jpg"
-                    else:
-                        photo['file_name'] += ".jpg"
-                    del photo['date']
-                # создаем глобальный словарь с добавлением ключа по названию альбома
-                total_photos_info[album_id['title']] = photos_info
+            total_photos_info[album_id['title']] = self.__photos_get(owner_id, album_id['id'])
         return total_photos_info
 
 
 if __name__ == '__main__':
-    # FILE_DIR1 = "Oksana_Magura"
-    # magur = VkAgent(Token.TOKEN_VK, '9681859')
-    # magur.files_downloader(FILE_DIR1)
-    # # PATH_DIR1 = os.path.join(os.getcwd(), FILE_DIR1)
-    # magur_load = Ya.YaUploader(Token.TOKEN_YA)
-    # magur_load.upload(PATH_DIR1)
-    # pprint(magur.photos_info())
-
     # FILE_DIR2 = "Oksa_Studio"
-    # oksa_studio = VkAgent(Token.TOKEN_VK, '-142029999')
-    # # pprint(oksa_studio.photos_info())
-    # oksa_studio.files_downloader(FILE_DIR2)
+    # oksa_studio = VkAgent()
+    # oksa_studio.files_downloader('-142029999', FILE_DIR2)
 
-    # FILE_DIR3 = "Netology"
-    # netology = VkAgent(Token.TOKEN_VK, '-30159897')
-    # # pprint(oksa_studio.photos_info())
-    # netology.files_downloader(FILE_DIR3)
-
-    # oksana = VkAgent(Token.TOKEN_VK, 448564047)
-    # # pprint(oksana.friends_info())
-    # # pprint(oksana.group_search('наращивание ресниц'))
-    # oksana.get_users(3)
-
-    # company1 = VkAgent(folder_name='ads_4')
-    # company1.group_search('наращивание ресниц')
-    # company1.get_users(count=3, month=3)
-    # company1.get_users_groups('ads_4_users_3_groups_3_month.txt')
-    # company1.groups_relevant()
-    # print(company1.get_user_groups('140052354'))
-
-    company2 = VkAgent(folder_name='ads_6')
-    # company2.group_search('наращивание ресниц')
-    # company2.get_users(count=2, month=8)
-    company2.get_users_groups('ads_6_users_2_groups_8_month_female_sex_110_city.txt')
+    company = VkAgent(folder_name='ads_6')
+    # company.group_search('наращивание ресниц')
+    # company.get_users(count=1, month=6)
+    company.get_users_groups('ads_6_users_1_groups_6_month_female_sex_110_city.txt')
