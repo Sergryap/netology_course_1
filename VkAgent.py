@@ -11,7 +11,7 @@ import random as rnd
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
 
-    def __init__(self, folder_name=None, token=Token.token_vk[0][1]):
+    def __init__(self, folder_name=None, token=Token.token_vk[0]):
         self.params = {'access_token': token, 'v': '5.131'}
         self.token = Token.token_vk
         self.author = 0
@@ -23,30 +23,26 @@ class VkAgent(Agent.Social):
             self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
             self.path_users = self._folder_creation(self.path_ads, 'users')
 
-    def __set_params(self, i=True):
-        self.author = rnd.randint(0, len(self.token) - 1) if i else self.author + 1
-        self.params = {'access_token': self.token[self.author][1], 'v': '5.131'}
+    def __set_params(self, zero=True):
+        self.author = 0 if zero else self.author + 1
+        print(f'Токен заменен!')
+        time.sleep(1)
+        self.params = {'access_token': self.token[self.author], 'v': '5.131'}
 
-    def __change_token(self, *args, **kwargs):
-        print('Замена токена!')
-        for key, value in kwargs.items():
-            if key == 'func':
-                func = value
-            if key == 'var':
-                var = value
-        if self.author < len(self.token) - 1:
-            self.__set_params(i=False)
-            print(f'1_token={self.author}')
-            return func(*args)
-        elif var:
-            if self.author == len(self.token) - 1:
-                self.__set_params()
-                print(f'2_token={self.author}')
-            return -1, -1
+    def res_stability(self, method, params_delta, i=0):
+        print(f'Глубина рекрсии: {i}/токен: {self.author}')
+        method_url = self.url + method
+        response = requests.get(method_url, params={**self.params, **params_delta}).json()
+        if 'response' in response:
+            return response
+        elif i == len(self.token) - 1:
+            return False
+        elif self.author < len(self.token) - 1:
+            self.__set_params(zero=False)
         elif self.author == len(self.token) - 1:
             self.__set_params()
-            print(f'3_token={self.author}')
-            return func(*args)
+        count = i + 1
+        return self.res_stability(method, params_delta, i=count)
 
     @staticmethod
     def verify_group(value: dict):
@@ -72,21 +68,18 @@ class VkAgent(Agent.Social):
         :return: словарь с ключами по id групп, значения словарь с названиями группы и числом участников
         """
         group_search = {}
-        group_url = self.url + 'groups.search'
         for soc in ['group', 'page', 'event']:
-            for offset in range(100):
+            for offset in range(150):
                 params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
                                 'offset': offset}
-                response = requests.get(group_url, params={**self.params, **params_delta}).json()
-                if 'response' in response:
+                response = self.res_stability('groups.search', params_delta)
+                if response:
                     for item in response['response']['items']:
                         print(item['id'])
                         if verify and self.verify_group(item):
                             group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
                         elif not verify:
                             group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
-                else:
-                    return self.__change_token(q, suffix, verify, relevant, func=self.group_search, var=False)
         # Добавляем количество участников по ключу count
         for group in group_search:
             print(f'+count: id{group}')
@@ -103,13 +96,12 @@ class VkAgent(Agent.Social):
         :param group_id: идентификатор группы
         :return: количество шагов (offset), количество участников в группе
         """
-        offset_url = self.url + 'groups.getMembers'
         params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': 0, 'fields': 'last_seen'}
-        response = requests.get(offset_url, params={**self.params, **params_delta}).json()
-        if 'response' in response:  # проверка доступности
+        response = self.res_stability('groups.getMembers', params_delta)
+        if response:
             count = response['response']['count']
             return count // 1000, count
-        return self.__change_token(group_id, func=self.__get_offset, var=True)
+        return -1, -1
 
     def __users_lock(self, user_id):
         """
@@ -117,11 +109,10 @@ class VkAgent(Agent.Social):
         :return: bool
         """
         params_delta = {'user_ids': user_id}
-        users_lock_url = self.url + 'users.get'
-        response = requests.get(users_lock_url, params={**self.params, **params_delta}).json()
-        if 'response' in response:
+        response = self.res_stability('users.get', params_delta)
+        if response and 'is_closed' in response['response'][0]:
             return response['response'][0]['is_closed']
-        return self.__change_token(user_id, func=self.__users_lock)
+        return -1, -1
 
     def __get_users(self, group_id, month, sex, city):
         """
@@ -135,21 +126,17 @@ class VkAgent(Agent.Social):
         good_id_list = []
         max_offset = self.__get_offset(group_id)[0]
         print(f'max_offset={max_offset}')
-        get_users_url = self.url + 'groups.getMembers'
         while offset <= max_offset:
             print(f'offset={offset}')
             params_delta = {'group_id': group_id, 'sort': 'id_desc', 'offset': offset, 'fields': 'last_seen,sex,city'}
-            response = requests.get(get_users_url, params={**self.params, **params_delta}).json()
-            if 'response' in response:
+            response = self.res_stability('groups.getMembers', params_delta)
+            if response:
                 offset += 1
                 for item in response['response']['items']:
                     time_start = round(time.time()) - round(month * 30.42 * 86400)
                     if 'last_seen' in item and item['last_seen']['time'] >= time_start and item['sex'] == sex:
                         if 'city' in item and item['city']['id'] == city:
                             good_id_list.append(item['id'])
-            else:
-                return self.__change_token(group_id, month, sex, city, func=self.__get_users, var=False)
-
         return good_id_list
 
     def get_users(self, count=2, month=4, sex=1, city=110):
@@ -200,11 +187,10 @@ class VkAgent(Agent.Social):
         """
         if self.__users_lock(user_id):
             return -1, -1
-        user_groups_url = self.url + 'groups.get'
         params_delta = {'user_id': user_id, 'offset': 0}
         print(f'offset=0')
-        response = requests.get(user_groups_url, params={**self.params, **params_delta}).json()
-        if 'response' in response:
+        response = self.res_stability('groups.get', params_delta)
+        if response:
             offset = 1
             max_offset = response['response']['count'] // 1000
             user_groups = []
@@ -212,12 +198,12 @@ class VkAgent(Agent.Social):
             while offset <= max_offset:
                 print(f'offset={offset}')
                 params_delta = {'user_id': user_id, 'offset': offset}
-                response = requests.get(user_groups_url, params={**self.params, **params_delta}).json()
+                response = self.res_stability('groups.get', params_delta)
                 user_groups.extend(response['response']['items'])
                 offset += 1
                 user_groups = list(set(user_groups))
             return user_groups, len(user_groups)
-        return self.__change_token(user_id, func=self.get_user_groups, var=True)
+        return -1, -1
 
     def get_users_groups(self, file_user_list: str):
         """
@@ -239,7 +225,6 @@ class VkAgent(Agent.Social):
         for count, user in enumerate(users_list, start=1):
             print(f'{count}/{count_end}: id{user.strip()}')
             user_groups_info = self.get_user_groups(user.strip())
-            # pprint(user_groups_info)
             users_groups[user.strip()] = {'count': user_groups_info[1],
                                           'groups': user_groups_info[0]
                                           }
@@ -269,12 +254,11 @@ class VkAgent(Agent.Social):
     def friends_info(self, user_id):
         """Метод friends.get VK"""
         friends_info = {}
-        friends_url = self.url + 'friends.get'
-        friends_params = {'user_id': user_id,
-                          'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
-                          }
-        response = requests.get(friends_url, params={**self.params, **friends_params}).json()
-        if 'response' in [response]:
+        params_delta = {'user_id': user_id,
+                        'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
+                        }
+        response = self.res_stability('friends.get', params_delta)
+        if response:
             for item in response['response']['items']:
                 city = country = 'Нет данных'
                 if 'country' in item:
@@ -288,17 +272,16 @@ class VkAgent(Agent.Social):
                     'country': country,
                     'city': city}
             return friends_info
-        return self.__change_token(user_id, func=self.friends_info, var=False)
+        return -1, -1
 
     def __albums_id(self, owner_id):
         """
         Cоздает список словарей, содержащих название и id
         альбомы пользователя
         """
-        photos_getalbums_url = self.url + 'photos.getAlbums'
-        photos_getalbums_params = {'owner_id': owner_id, 'need_system': '1'}
-        response = requests.get(photos_getalbums_url, params={**self.params, **photos_getalbums_params}).json()
-        if 'response' in response:
+        params_delta = {'owner_id': owner_id, 'need_system': '1'}
+        response = self.res_stability('photos.getAlbums', params_delta)
+        if response:
             albums_id = []
             for item in response['response']['items']:
                 albums_id.append({
@@ -306,7 +289,7 @@ class VkAgent(Agent.Social):
                     'id': item['id']
                 })
             return albums_id
-        return self.__change_token(owner_id, func=self.__albums_id, var=False)
+        return -1, -1
 
     @staticmethod
     def __get_items(item: dict):
@@ -337,10 +320,9 @@ class VkAgent(Agent.Social):
 
     def __photos_get(self, owner_id, album_id):
         """Создает список для метода photos_info"""
-        photos_get_url = self.url + 'photos.get'
-        photos_get_params = {'owner_id': owner_id, 'album_id': album_id, 'extended': 1}
-        response = requests.get(photos_get_url, params={**self.params, **photos_get_params}).json()
-        if 'response' in response:
+        params_delta = {'owner_id': owner_id, 'album_id': album_id, 'extended': 1}
+        response = self.res_stability('photos.get', params_delta)
+        if response:
             photos_info = []
             file_names_count = {}
             for item in response['response']['items']:
@@ -368,7 +350,7 @@ class VkAgent(Agent.Social):
                     photo['file_name'] += ".jpg"
                 del photo['date']
             return photos_info
-        return self.__change_token(owner_id, album_id, func=self.__photos_get, var=False)
+        return -1, -1
 
     def photos_info(self, owner_id):
         """
@@ -390,7 +372,7 @@ if __name__ == '__main__':
     # oksa_studio = VkAgent()
     # oksa_studio.files_downloader('-142029999', FILE_DIR2)
 
-    company = VkAgent(folder_name='ads_6')
-    # company.group_search('наращивание ресниц')
-    # company.get_users(count=1, month=6)
-    company.get_users_groups('ads_6_users_1_groups_6_month_female_sex_110_city.txt')
+    company = VkAgent(folder_name='ads_7')
+    company.group_search('наращивание ресниц')
+    # company.get_users(count=2, month=6)
+    # company.get_users_groups('ads_7_users_2_groups_6_month_female_sex_110_city.txt')

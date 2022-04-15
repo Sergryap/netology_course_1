@@ -11,7 +11,7 @@ from pprint import pprint
 
 class Botovod(VkAgent.VkAgent):
 
-    def __init__(self, folder_name, token=Token.token_vk[0][1]):
+    def __init__(self, folder_name, token=Token.token_vk[0]):
         super().__init__(folder_name, token=token)
         self.list_relevant = ['наращивание ресниц', 'брови', 'ламинирование', 'красота', 'мода']
 
@@ -35,7 +35,7 @@ class Botovod(VkAgent.VkAgent):
                     os.path.isfile(os.path.join(self.path_relevant, file)) and 'relevant' in file)
         groups_list = []
         for file in gen_file:
-            with open(file, encoding="utf-8") as f:
+            with open(file, encoding="utf-8-sig") as f:
                 try:
                     groups_list.extend(json.load(f).keys())
                 except json.decoder.JSONDecodeError:
@@ -144,6 +144,6 @@ class Botovod(VkAgent.VkAgent):
 
 
 if __name__ == '__main__':
-    b1 = Botovod(folder_name='ads_6')
+    b1 = Botovod(folder_name='ads_7')
     # b1.get_list_relevant()
-    b1.get_bot_list('ads_6_users_groups.json', count=500, stop_gr=50, gr=500)
+    b1.get_bot_list('ads_7_users_groups.json', count=700, stop_gr=50, gr=200)
