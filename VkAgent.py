@@ -69,10 +69,12 @@ class VkAgent(Agent.Social):
         """
         group_search = {}
         for soc in ['group', 'page']:
-            for offset in range(200):
+            offset = 0
+            while True:
                 params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
                                 'offset': offset}
                 response = self.res_stability('groups.search', params_delta)
+                offset += 1
                 if response and response['response']['items']:
                     for item in response['response']['items']:
                         print(item['id'])
