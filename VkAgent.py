@@ -30,7 +30,7 @@ class VkAgent(Agent.Social):
         self.params = {'access_token': self.token[self.author], 'v': '5.131'}
 
     def res_stability(self, method, params_delta, i=0):
-        print(f'Глубина рекрсии: {i}/токен: {self.author}')
+        print(f'Глубина рекурсии: {i}/токен: {self.author}')
         method_url = self.url + method
         response = requests.get(method_url, params={**self.params, **params_delta}).json()
         if 'response' in response:
@@ -77,7 +77,7 @@ class VkAgent(Agent.Social):
                 offset += 1
                 if response and response['response']['items']:
                     for item in response['response']['items']:
-                        print(item['id'])
+                        print(f"offset={offset}/id{item['id']}")
                         if verify and self.verify_group(item):
                             group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
                         elif not verify:
