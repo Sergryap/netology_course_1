@@ -68,18 +68,21 @@ class VkAgent(Agent.Social):
         :return: словарь с ключами по id групп, значения словарь с названиями группы и числом участников
         """
         group_search = {}
-        for soc in ['group', 'page', 'event']:
-            for offset in range(150):
+        for soc in ['group', 'page']:
+            for offset in range(200):
                 params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
                                 'offset': offset}
                 response = self.res_stability('groups.search', params_delta)
-                if response:
+                if response and response['response']['items']:
                     for item in response['response']['items']:
                         print(item['id'])
                         if verify and self.verify_group(item):
                             group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
                         elif not verify:
                             group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
+                else:
+                    break
+
         # Добавляем количество участников по ключу count
         for group in group_search:
             print(f'+count: id{group}')
@@ -205,7 +208,7 @@ class VkAgent(Agent.Social):
             return user_groups, len(user_groups)
         return -1, -1
 
-    def get_users_groups(self, file_user_list: str):
+    def get_users_groups(self):
         """
         Создает словарь :
         {'user_id':
@@ -214,13 +217,17 @@ class VkAgent(Agent.Social):
         ...
         }
         Записывает в файлы по 1000 'user_id' в каждом
-        :param file_user_list: файл со списком id пользователей в дирректрии self.path_ads
         """
         users_groups = {}
+        user_files = os.listdir(self.path_users)
+        print('Выберите файл для анализа:')
+        for i, user_file in enumerate(user_files, start=1):
+            print(f'{i}: "{user_file}"')
+        n = int(input('Введите номер файл для анализа: ').strip())
+        file_user_list = user_files[n - 1]
         with open(os.path.join(self.path_users, file_user_list), encoding="utf-8") as f:
             users_list = f.readlines()
         print('Получаем данные:')
-        # time.sleep(0.1)
         count_end = len(users_list)
         for count, user in enumerate(users_list, start=1):
             print(f'{count}/{count_end}: id{user.strip()}')
@@ -374,5 +381,5 @@ if __name__ == '__main__':
 
     company = VkAgent(folder_name='ads_7')
     company.group_search('наращивание ресниц')
-    # company.get_users(count=2, month=6)
-    # company.get_users_groups('ads_7_users_2_groups_6_month_female_sex_110_city.txt')
+    # company.get_users(count=3, month=4)
+    # company.get_users_groups()
