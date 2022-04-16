@@ -58,13 +58,14 @@ class VkAgent(Agent.Social):
                 and 'ресниц' in value['name'].lower()
                 )
 
-    def group_search(self, q: str, suffix='groups', verify=True, relevant=False):
+    def group_search(self, q: str, members=100, suffix='groups', verify=True, relevant=False):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
         :param suffix: суффикс для создаваемого итогового файла
         :param verify: указывает на необходимость проверки по условию verify_group
         :param relevant: указывается True при поиске релевантных групп
+        :param members: минимальное количество участников группы
         :return: словарь с ключами по id групп, значения словарь с названиями группы и числом участников
         """
         group_search = {}
@@ -86,9 +87,14 @@ class VkAgent(Agent.Social):
                     break
 
         # Добавляем количество участников по ключу count
-        for group in group_search:
+        # Удаляем группы с числом участкниов менее members
+        for group in group_search.copy():
             print(f'+count: id{group}')
-            group_search[group]['count'] = self.__get_offset(group)[1]
+            count = self.__get_offset(group)[1]
+            if count < members:
+                del group_search[group]
+            else:
+                group_search[group]['count'] = count
         path_result = self.path_relevant if relevant else self.path_ads
         group_result_json = os.path.join(path_result, f"{os.path.split(self.path_ads)[1]}_{suffix}.json")
         with open(group_result_json, 'w', encoding="utf-8") as f:
@@ -222,11 +228,16 @@ class VkAgent(Agent.Social):
         """
         users_groups = {}
         user_files = os.listdir(self.path_users)
-        print('Выберите файл для анализа:')
-        for i, user_file in enumerate(user_files, start=1):
-            print(f'{i}: "{user_file}"')
-        n = int(input('Введите номер файл для анализа: ').strip())
+        if len(user_files) == 1:
+            n = 1
+        else:
+            for i, user_file in enumerate(user_files, start=1):
+                print(f'{i}: "{user_file}"')
+            n = int(input('Введите номер файл для анализа: ').strip())
         file_user_list = user_files[n - 1]
+        print('Получаем данные по группам пользователей из файла:')
+        print(file_user_list)
+        time.sleep(3)
         with open(os.path.join(self.path_users, file_user_list), encoding="utf-8") as f:
             users_list = f.readlines()
         print('Получаем данные:')
@@ -381,7 +392,7 @@ if __name__ == '__main__':
     # oksa_studio = VkAgent()
     # oksa_studio.files_downloader('-142029999', FILE_DIR2)
 
-    company = VkAgent(folder_name='ads_7')
-    company.group_search('наращивание ресниц')
+    company = VkAgent(folder_name='ads_8')
+    # company.group_search('наращивание ресниц')
     # company.get_users(count=3, month=4)
     # company.get_users_groups()
