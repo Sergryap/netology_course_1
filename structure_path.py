@@ -48,6 +48,6 @@ def load_json(data_dict):
 
 
 if __name__ == '__main__':
-    data = structure("E:\\Загрузки")
+    data = structure("VK_ads")
     # data = structure("C:\\")
     load_json(data)

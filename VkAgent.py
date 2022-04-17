@@ -1,7 +1,6 @@
 import requests
 import os
 import json
-import Token
 import Ya
 import Agent
 import time
@@ -10,10 +9,11 @@ import random as rnd
 
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
+    with open(os.path.join(os.getcwd(), "Token.txt"), encoding='utf-8') as file:
+        token = [t.strip() for t in file.readlines()]
 
-    def __init__(self, folder_name=None, token=Token.token_vk[0]):
-        self.params = {'access_token': token, 'v': '5.131'}
-        self.token = Token.token_vk
+    def __init__(self, folder_name=None, tok=token[0]):
+        self.params = {'access_token': tok, 'v': '5.131'}
         self.author = 0
         if folder_name:
             self.folder_name = folder_name
@@ -25,8 +25,8 @@ class VkAgent(Agent.Social):
 
     def __set_params(self, zero=True):
         self.author = 0 if zero else self.author + 1
-        print(f'Токен заменен!')
-        time.sleep(1)
+        print(f'Токен заменен на >>> {self.author}!')
+        time.sleep(0.5)
         self.params = {'access_token': self.token[self.author], 'v': '5.131'}
 
     def res_stability(self, method, params_delta, i=0):
@@ -49,14 +49,36 @@ class VkAgent(Agent.Social):
         """
         Условие включения группы в отбор
         """
-        return ('обучение' not in value['name'].lower()
-                and 'материалы' not in value['name'].lower()
-                and 'материалов' not in value['name'].lower()
-                and 'всё для' not in value['name'].lower()
-                and 'все для' not in value['name'].lower()
-                and 'бесплатно' not in value['name'].lower()
-                and 'ресниц' in value['name'].lower()
-                )
+        with open(os.path.join(os.getcwd(), 'words.txt')) as file:
+            words = [rew.strip().lower() for rew in file.readlines()]
+        for rew in words:
+            if rew == 'stop':
+                flag = False
+                continue
+            elif rew == 'require':
+                flag = True
+                count = 0
+                continue
+            if rew in value['name'].lower():
+                if not flag:
+                    return False
+                elif flag:
+                    return True
+            if flag:
+                count += 1
+                print(count)
+        if count == 0:
+            return True
+        return False
+
+        # return ('обучение' not in value['name'].lower()
+        #         and 'материалы' not in value['name'].lower()
+        #         and 'материалов' not in value['name'].lower()
+        #         and 'всё для' not in value['name'].lower()
+        #         and 'все для' not in value['name'].lower()
+        #         and 'бесплатно' not in value['name'].lower()
+        #         and 'ресниц' in value['name'].lower()
+        #         )
 
     def group_search(self, q: str, members=100, suffix='groups', verify=True, relevant=False):
         """
@@ -90,7 +112,7 @@ class VkAgent(Agent.Social):
         # Удаляем группы с числом участкниов менее members
         for group in group_search.copy():
             print(f'+count: id{group}')
-            count = self.__get_offset(group)[1]
+            count = self._get_offset(group)[1]
             if count < members:
                 del group_search[group]
             else:
@@ -101,7 +123,7 @@ class VkAgent(Agent.Social):
             json.dump(group_search, f, indent=2, ensure_ascii=False)
         return group_search
 
-    def __get_offset(self, group_id):
+    def _get_offset(self, group_id):
         """
         Определение количества шагов для анализа группы и числа участников
         :param group_id: идентификатор группы
@@ -135,7 +157,7 @@ class VkAgent(Agent.Social):
         """
         offset = 0
         good_id_list = []
-        max_offset = self.__get_offset(group_id)[0]
+        max_offset = self._get_offset(group_id)[0]
         print(f'max_offset={max_offset}')
         while offset <= max_offset:
             print(f'offset={offset}')
@@ -387,12 +409,21 @@ class VkAgent(Agent.Social):
         return total_photos_info
 
 
+def search_ads():
+    folder_name = input(f'Введите название папки для проекта VK_ads: ').strip()
+    company = VkAgent(folder_name)
+    # q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
+    # company.group_search(q=q)
+    print('Введите данные для отбора аудитории:')
+    count = int(input('Состоит не менее чем в N релевантных группах:').strip())
+    month = int(input('Последняя активность не менее N месяцев назад: ').strip())
+    company.get_users(count=count, month=month)
+    company.get_users_groups()
+
+
 if __name__ == '__main__':
+    search_ads()
+
     # FILE_DIR2 = "Oksa_Studio"
     # oksa_studio = VkAgent()
     # oksa_studio.files_downloader('-142029999', FILE_DIR2)
-
-    company = VkAgent(folder_name='ads_8')
-    # company.group_search('наращивание ресниц')
-    # company.get_users(count=3, month=4)
-    # company.get_users_groups()
