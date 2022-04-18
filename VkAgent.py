@@ -5,6 +5,7 @@ import Ya
 import Agent
 import time
 import random as rnd
+from pprint import pprint
 
 
 class VkAgent(Agent.Social):
@@ -26,7 +27,7 @@ class VkAgent(Agent.Social):
     def __set_params(self, zero=True):
         self.author = 0 if zero else self.author + 1
         print(f'Токен заменен на >>> {self.author}!')
-        time.sleep(0.5)
+        # time.sleep(0.5)
         self.params = {'access_token': self.token[self.author], 'v': '5.131'}
 
     def res_stability(self, method, params_delta, i=0):
@@ -259,7 +260,7 @@ class VkAgent(Agent.Social):
         file_user_list = user_files[n - 1]
         print('Получаем данные по группам пользователей из файла:')
         print(file_user_list)
-        time.sleep(3)
+        # time.sleep(3)
         with open(os.path.join(self.path_users, file_user_list), encoding="utf-8") as f:
             users_list = f.readlines()
         print('Получаем данные:')
@@ -282,6 +283,7 @@ class VkAgent(Agent.Social):
         return self.__union_users_files()
 
     def __union_users_files(self):
+        """Объединяет файлы с группами пользоватлей в один"""
         gen_file = (os.path.join(self.path_analise, f) for f in os.listdir(self.path_analise))
         users_groups = {}
         for file in gen_file:
@@ -293,28 +295,35 @@ class VkAgent(Agent.Social):
             json.dump(users_groups, f, indent=4, ensure_ascii=False)
         return users_groups
 
-    def friends_info(self, user_id):
+    def friends_info(self, user_id, count_only=True):
         """Метод friends.get VK"""
-        friends_info = {}
-        params_delta = {'user_id': user_id,
-                        'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
-                        }
-        response = self.res_stability('friends.get', params_delta)
-        if response:
-            for item in response['response']['items']:
-                city = country = 'Нет данных'
-                if 'country' in item:
-                    country = item['country']['title']
-                if 'city' in item:
-                    city = item['city']['title']
-                friends_info[f"id{item['id']}"] = {
-                    'first_name': item['first_name'],
-                    'last_name': item['last_name'],
-                    'avatar_url': item['photo_200_orig'],
-                    'country': country,
-                    'city': city}
-            return friends_info
-        return -1, -1
+        if count_only:
+            params_delta = {'user_id': user_id}
+            response = self.res_stability('friends.get', params_delta)
+            if response:
+                return response['response']['count']
+        else:
+            friends_info = {}
+            params_delta = {'user_id': user_id,
+                            'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
+                            }
+            response = self.res_stability('friends.get', params_delta)
+            if response:
+                friends_info['count'] = response['response']['count']
+                for item in response['response']['items']:
+                    city = country = 'Нет данных'
+                    if 'country' in item:
+                        country = item['country']['title']
+                    if 'city' in item:
+                        city = item['city']['title']
+                    friends_info[f"id{item['id']}"] = {
+                        'first_name': item['first_name'],
+                        'last_name': item['last_name'],
+                        'avatar_url': item['photo_200_orig'],
+                        'country': country,
+                        'city': city}
+                return friends_info
+        return -1
 
     def __albums_id(self, owner_id):
         """
@@ -404,7 +413,7 @@ class VkAgent(Agent.Social):
         total_photos_info = {}
         for album_id in self.__albums_id(owner_id):
             print(f"Получаем данные из альбома: {album_id['title']}")
-            time.sleep(rnd.randint(1, 5))
+            # time.sleep(rnd.randint(1, 5))
             total_photos_info[album_id['title']] = self.__photos_get(owner_id, album_id['id'])
         return total_photos_info
 
@@ -422,7 +431,9 @@ def search_ads():
 
 
 if __name__ == '__main__':
-    search_ads()
+    # search_ads()
+    vk1 = VkAgent()
+    pprint(vk1.friends_info("6055736"))
 
     # FILE_DIR2 = "Oksa_Studio"
     # oksa_studio = VkAgent()

@@ -91,6 +91,7 @@ class Botovod(VkAgent.VkAgent):
         ключи - id пользователя,
         значения - {'groups': список групп пользователя, "count': количество участников}
         :param count: минимальное учитываемое количество вхождений группы
+        :param min_gr_count: число участников группы, при меньшем значении группа относится к исключаемой
         :return: словарь ключи - id групп
         значения - количество вхождений в группы пользователей
         """
@@ -136,7 +137,7 @@ class Botovod(VkAgent.VkAgent):
             for group in groups['groups']:
                 if group in count_groups:
                     i += 1
-            if i >= stop_gr or groups['count'] >= gr:
+            if i >= stop_gr or groups['count'] >= gr or self.friends_info(user) > 3000:
                 print(f"{i}/{stop_gr}, {groups['count']}/{gr}")
                 bot_users.append(user)
 
@@ -150,4 +151,4 @@ class Botovod(VkAgent.VkAgent):
 if __name__ == '__main__':
     b1 = Botovod(folder_name='ads_9')
     # b1.get_list_relevant()
-    b1.get_bot_list('ads_9_users_groups.json', count=500, stop_gr=20, gr=200, min_gr_count=20000)
+    b1.get_bot_list('ads_9_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=25000)
