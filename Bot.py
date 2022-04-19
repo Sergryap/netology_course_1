@@ -1,3 +1,4 @@
+import fileinput
 import requests
 import os
 import json
@@ -137,7 +138,7 @@ class Botovod(VkAgent.VkAgent):
             for group in groups['groups']:
                 if group in count_groups:
                     i += 1
-            if i >= stop_gr or groups['count'] >= gr or self.friends_info(user) > 3000:
+            if i >= stop_gr or groups['count'] >= gr or self.friends_info(user) > 2500:
                 print(f"{i}/{stop_gr}, {groups['count']}/{gr}")
                 bot_users.append(user)
 
@@ -147,8 +148,49 @@ class Botovod(VkAgent.VkAgent):
             for user in bot_users:
                 f.write(f'{user}\n')
 
+    def get_target_audience(self):
+        """Получение списка пользователей, очищенного от нежелательных пользователей"""
+
+        bots = os.listdir(self.path_bot)
+        all_user_bots = set()
+        with fileinput.FileInput([os.path.join(self.path_bot, f) for f in bots if 'all_bots' not in f],
+                                 encoding='utf-8') as lines:
+            for bot in lines:
+                all_user_bots.add(bot)
+        with open(os.path.join(self.path_bot, 'all_bots.txt'), 'w', encoding="utf-8") as f:
+            for bot in all_user_bots:
+                f.write(f'{bot}')
+
+        users = os.listdir(self.path_users)
+        for n, f in enumerate(users, start=1):
+            file = os.path.join(self.path_users, f)
+            with open(file, encoding="utf-8") as file_users:
+                print(f'{n}: {f}, количество={len(file_users.readlines())}')
+        i = int(input('Выберите первоначальный файл пользователей: ').strip())
+        print()
+        with open(os.path.join(self.path_users, users[i - 1]), encoding="utf-8") as file_users:
+            all_users = set([f.strip() for f in file_users.readlines()])
+
+        bots = sorted(os.listdir(self.path_bot))
+        for n, f in enumerate(bots, start=1):
+            file = os.path.join(self.path_bot, f)
+            with open(file, encoding="utf-8") as file_bots:
+                print(f'{n}: {f}, количество={len(file_bots.readlines())}')
+        j = int(input('Выберите файл с нежелательными пользователями: ').strip())
+        print()
+        with open(os.path.join(self.path_bot, bots[j - 1]), encoding="utf-8") as file_bots:
+            bot_users = set([f.strip() for f in file_bots.readlines()])
+
+        file_target = os.path.join(self.path_target,
+                                   f'{(users[i - 1]).split(".")[0]}_free_№_{len(os.listdir(self.path_target)) + 1}.txt')
+        with open(file_target, 'w', encoding="utf-8") as f:
+            for user in list(all_users - bot_users):
+                f.write(f'{user}\n')
+        return list(all_users - bot_users)
+
 
 if __name__ == '__main__':
     b1 = Botovod(folder_name='ads_9')
     # b1.get_list_relevant()
-    b1.get_bot_list('ads_9_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=25000)
+    # b1.get_bot_list('ads_9_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=25000)
+    b1.get_target_audience()

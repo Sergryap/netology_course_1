@@ -23,6 +23,7 @@ class VkAgent(Agent.Social):
             self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
             self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
             self.path_users = self._folder_creation(self.path_ads, 'users')
+            self.path_target = self._folder_creation(self.path_ads, 'target_audience')
 
     def __set_params(self, zero=True):
         self.author = 0 if zero else self.author + 1
