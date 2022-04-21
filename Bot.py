@@ -13,7 +13,7 @@ class Botovod(VkAgent.VkAgent):
 
     def __init__(self, folder_name):
         super().__init__(folder_name)
-        self.list_relevant = ['наращивание ресниц', 'брови', 'ламинирование', 'красота', 'мода']
+        self.list_relevant = ['наращивание ресниц', 'брови', 'маникюр', 'макияж', 'ламинирование', 'красота', 'мода']
 
     def __groups_relevant(self):
         """
@@ -190,7 +190,7 @@ class Botovod(VkAgent.VkAgent):
 
 
 if __name__ == '__main__':
-    b1 = Botovod(folder_name='ads_9')
+    b1 = Botovod(folder_name='ads_10')
     # b1.get_list_relevant()
-    # b1.get_bot_list('ads_9_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=25000)
+    # b1.get_bot_list('ads_10_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=10000)
     b1.get_target_audience()

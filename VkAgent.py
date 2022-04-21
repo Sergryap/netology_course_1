@@ -82,7 +82,7 @@ class VkAgent(Agent.Social):
         #         and 'ресниц' in value['name'].lower()
         #         )
 
-    def group_search(self, q: str, members=100, suffix='groups', verify=True, relevant=False):
+    def group_search(self, q: str, members=50, suffix='groups', verify=True, relevant=False):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
@@ -138,7 +138,7 @@ class VkAgent(Agent.Social):
             return count // 1000, count
         return -1, -1
 
-    def __users_lock(self, user_id):
+    def _users_lock(self, user_id):
         """
         Получение информации о том закрытый или нет профиль пользователя
         :return: bool
@@ -220,7 +220,7 @@ class VkAgent(Agent.Social):
         :param user_id: id пользователя, для которого создается кортеж
         :return: обозначенный кортеж из списка и количества групп
         """
-        if self.__users_lock(user_id):
+        if self._users_lock(user_id):
             return -1, -1
         params_delta = {'user_id': user_id, 'offset': 0}
         print(f'offset=0')
@@ -420,21 +420,34 @@ class VkAgent(Agent.Social):
 
 
 def search_ads():
-    folder_name = input(f'Введите название папки для проекта VK_ads: ').strip()
+
+    folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
-    # q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
-    # company.group_search(q=q)
-    print('Введите данные для отбора аудитории:')
+    print('Выполнить новый поиск групп или использовать ранее выполненный:')
+    i = input('"Y" - новый поиcк, "любой символ" - использовать существующий').strip().lower()
+    if i == 'y':
+        q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
+        company.group_search(q=q)
+    elif not os.path.isfile(os.path.join(company.path_ads, f"{os.path.split(company.path_ads)[1]}_groups.json")):
+        print('Целевых групп не создано, сначала выполните поиск')
+        q = input('Введите ключевую фразу для поиска групп: ').strip().lower()
+        company.group_search(q=q)
+
+    print('Введите данные для отбора целевой аудитории:')
     count = int(input('Состоит не менее чем в N релевантных группах:').strip())
     month = int(input('Последняя активность не менее N месяцев назад: ').strip())
     company.get_users(count=count, month=month)
-    company.get_users_groups()
+
+    q = input('Выполнить поиск групп пользователей по всем отобранным пользователям ("Y"/"N"): ').strip().lower()
+    if q == "y":
+        company.get_users_groups()
 
 
 if __name__ == '__main__':
     # search_ads()
-    vk1 = VkAgent()
-    pprint(vk1.friends_info("6055736"))
+    vk1 = VkAgent('ads_10')
+    vk1.get_users_groups()
+    # pprint(vk1.friends_info("6055736"))
 
     # FILE_DIR2 = "Oksa_Studio"
     # oksa_studio = VkAgent()
