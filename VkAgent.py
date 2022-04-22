@@ -73,15 +73,6 @@ class VkAgent(Agent.Social):
             return True
         return False
 
-        # return ('обучение' not in value['name'].lower()
-        #         and 'материалы' not in value['name'].lower()
-        #         and 'материалов' not in value['name'].lower()
-        #         and 'всё для' not in value['name'].lower()
-        #         and 'все для' not in value['name'].lower()
-        #         and 'бесплатно' not in value['name'].lower()
-        #         and 'ресниц' in value['name'].lower()
-        #         )
-
     def group_search(self, q: str, members=50, suffix='groups', verify=True, relevant=False):
         """
         Поиск групп по ключевой фразе
@@ -420,7 +411,6 @@ class VkAgent(Agent.Social):
 
 
 def search_ads():
-
     folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
     print('Выполнить новый поиск групп или использовать ранее выполненный:')
