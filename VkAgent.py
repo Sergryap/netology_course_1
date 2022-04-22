@@ -1,19 +1,20 @@
 import requests
 import os
 import json
-import Token
 import Ya
 import Agent
 import time
 import random as rnd
+from pprint import pprint
 
 
 class VkAgent(Agent.Social):
     url = 'https://api.vk.com/method/'
+    with open(os.path.join(os.getcwd(), "Token.txt"), encoding='utf-8') as file:
+        token = [t.strip() for t in file.readlines()]
 
-    def __init__(self, folder_name=None, token=Token.token_vk[0]):
-        self.params = {'access_token': token, 'v': '5.131'}
-        self.token = Token.token_vk
+    def __init__(self, folder_name=None, tok=token[0]):
+        self.params = {'access_token': tok, 'v': '5.131'}
         self.author = 0
         if folder_name:
             self.folder_name = folder_name
@@ -22,11 +23,12 @@ class VkAgent(Agent.Social):
             self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
             self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
             self.path_users = self._folder_creation(self.path_ads, 'users')
+            self.path_target = self._folder_creation(self.path_ads, 'target_audience')
 
     def __set_params(self, zero=True):
         self.author = 0 if zero else self.author + 1
-        print(f'Токен заменен!')
-        time.sleep(1)
+        print(f'Токен заменен на >>> {self.author}!')
+        # time.sleep(0.5)
         self.params = {'access_token': self.token[self.author], 'v': '5.131'}
 
     def res_stability(self, method, params_delta, i=0):
@@ -49,16 +51,38 @@ class VkAgent(Agent.Social):
         """
         Условие включения группы в отбор
         """
-        return ('обучение' not in value['name'].lower()
-                and 'материалы' not in value['name'].lower()
-                and 'материалов' not in value['name'].lower()
-                and 'всё для' not in value['name'].lower()
-                and 'все для' not in value['name'].lower()
-                and 'бесплатно' not in value['name'].lower()
-                and 'ресниц' in value['name'].lower()
-                )
+        with open(os.path.join(os.getcwd(), 'words.txt')) as file:
+            words = [rew.strip().lower() for rew in file.readlines()]
+        for rew in words:
+            if rew == 'stop':
+                flag = False
+                continue
+            elif rew == 'require':
+                flag = True
+                count = 0
+                continue
+            if rew in value['name'].lower():
+                if not flag:
+                    return False
+                elif flag:
+                    return True
+            if flag:
+                count += 1
+                print(count)
+        if count == 0:
+            return True
+        return False
 
-    def group_search(self, q: str, members=100, suffix='groups', verify=True, relevant=False):
+        # return ('обучение' not in value['name'].lower()
+        #         and 'материалы' not in value['name'].lower()
+        #         and 'материалов' not in value['name'].lower()
+        #         and 'всё для' not in value['name'].lower()
+        #         and 'все для' not in value['name'].lower()
+        #         and 'бесплатно' not in value['name'].lower()
+        #         and 'ресниц' in value['name'].lower()
+        #         )
+
+    def group_search(self, q: str, members=50, suffix='groups', verify=True, relevant=False):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
@@ -90,7 +114,7 @@ class VkAgent(Agent.Social):
         # Удаляем группы с числом участкниов менее members
         for group in group_search.copy():
             print(f'+count: id{group}')
-            count = self.__get_offset(group)[1]
+            count = self._get_offset(group)[1]
             if count < members:
                 del group_search[group]
             else:
@@ -101,7 +125,7 @@ class VkAgent(Agent.Social):
             json.dump(group_search, f, indent=2, ensure_ascii=False)
         return group_search
 
-    def __get_offset(self, group_id):
+    def _get_offset(self, group_id):
         """
         Определение количества шагов для анализа группы и числа участников
         :param group_id: идентификатор группы
@@ -114,7 +138,7 @@ class VkAgent(Agent.Social):
             return count // 1000, count
         return -1, -1
 
-    def __users_lock(self, user_id):
+    def _users_lock(self, user_id):
         """
         Получение информации о том закрытый или нет профиль пользователя
         :return: bool
@@ -135,7 +159,7 @@ class VkAgent(Agent.Social):
         """
         offset = 0
         good_id_list = []
-        max_offset = self.__get_offset(group_id)[0]
+        max_offset = self._get_offset(group_id)[0]
         print(f'max_offset={max_offset}')
         while offset <= max_offset:
             print(f'offset={offset}')
@@ -196,7 +220,7 @@ class VkAgent(Agent.Social):
         :param user_id: id пользователя, для которого создается кортеж
         :return: обозначенный кортеж из списка и количества групп
         """
-        if self.__users_lock(user_id):
+        if self._users_lock(user_id):
             return -1, -1
         params_delta = {'user_id': user_id, 'offset': 0}
         print(f'offset=0')
@@ -237,7 +261,7 @@ class VkAgent(Agent.Social):
         file_user_list = user_files[n - 1]
         print('Получаем данные по группам пользователей из файла:')
         print(file_user_list)
-        time.sleep(3)
+        # time.sleep(3)
         with open(os.path.join(self.path_users, file_user_list), encoding="utf-8") as f:
             users_list = f.readlines()
         print('Получаем данные:')
@@ -260,6 +284,7 @@ class VkAgent(Agent.Social):
         return self.__union_users_files()
 
     def __union_users_files(self):
+        """Объединяет файлы с группами пользоватлей в один"""
         gen_file = (os.path.join(self.path_analise, f) for f in os.listdir(self.path_analise))
         users_groups = {}
         for file in gen_file:
@@ -271,28 +296,35 @@ class VkAgent(Agent.Social):
             json.dump(users_groups, f, indent=4, ensure_ascii=False)
         return users_groups
 
-    def friends_info(self, user_id):
+    def friends_info(self, user_id, count_only=True):
         """Метод friends.get VK"""
-        friends_info = {}
-        params_delta = {'user_id': user_id,
-                        'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
-                        }
-        response = self.res_stability('friends.get', params_delta)
-        if response:
-            for item in response['response']['items']:
-                city = country = 'Нет данных'
-                if 'country' in item:
-                    country = item['country']['title']
-                if 'city' in item:
-                    city = item['city']['title']
-                friends_info[f"id{item['id']}"] = {
-                    'first_name': item['first_name'],
-                    'last_name': item['last_name'],
-                    'avatar_url': item['photo_200_orig'],
-                    'country': country,
-                    'city': city}
-            return friends_info
-        return -1, -1
+        if count_only:
+            params_delta = {'user_id': user_id}
+            response = self.res_stability('friends.get', params_delta)
+            if response:
+                return response['response']['count']
+        else:
+            friends_info = {}
+            params_delta = {'user_id': user_id,
+                            'fields': 'nickname,domain,sex,bdate,city,country,timezone,photo_200_orig'
+                            }
+            response = self.res_stability('friends.get', params_delta)
+            if response:
+                friends_info['count'] = response['response']['count']
+                for item in response['response']['items']:
+                    city = country = 'Нет данных'
+                    if 'country' in item:
+                        country = item['country']['title']
+                    if 'city' in item:
+                        city = item['city']['title']
+                    friends_info[f"id{item['id']}"] = {
+                        'first_name': item['first_name'],
+                        'last_name': item['last_name'],
+                        'avatar_url': item['photo_200_orig'],
+                        'country': country,
+                        'city': city}
+                return friends_info
+        return -1
 
     def __albums_id(self, owner_id):
         """
@@ -382,17 +414,41 @@ class VkAgent(Agent.Social):
         total_photos_info = {}
         for album_id in self.__albums_id(owner_id):
             print(f"Получаем данные из альбома: {album_id['title']}")
-            time.sleep(rnd.randint(1, 5))
+            # time.sleep(rnd.randint(1, 5))
             total_photos_info[album_id['title']] = self.__photos_get(owner_id, album_id['id'])
         return total_photos_info
 
 
+def search_ads():
+
+    folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
+    company = VkAgent(folder_name)
+    print('Выполнить новый поиск групп или использовать ранее выполненный:')
+    i = input('"Y" - новый поиcк, "любой символ" - использовать существующий').strip().lower()
+    if i == 'y':
+        q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
+        company.group_search(q=q)
+    elif not os.path.isfile(os.path.join(company.path_ads, f"{os.path.split(company.path_ads)[1]}_groups.json")):
+        print('Целевых групп не создано, сначала выполните поиск')
+        q = input('Введите ключевую фразу для поиска групп: ').strip().lower()
+        company.group_search(q=q)
+
+    print('Введите данные для отбора целевой аудитории:')
+    count = int(input('Состоит не менее чем в N релевантных группах:').strip())
+    month = int(input('Последняя активность не менее N месяцев назад: ').strip())
+    company.get_users(count=count, month=month)
+
+    q = input('Выполнить поиск групп пользователей по всем отобранным пользователям ("Y"/"N"): ').strip().lower()
+    if q == "y":
+        company.get_users_groups()
+
+
 if __name__ == '__main__':
+    # search_ads()
+    vk1 = VkAgent('ads_10')
+    vk1.get_users_groups()
+    # pprint(vk1.friends_info("6055736"))
+
     # FILE_DIR2 = "Oksa_Studio"
     # oksa_studio = VkAgent()
     # oksa_studio.files_downloader('-142029999', FILE_DIR2)
-
-    company = VkAgent(folder_name='ads_8')
-    # company.group_search('наращивание ресниц')
-    # company.get_users(count=3, month=4)
-    # company.get_users_groups()
