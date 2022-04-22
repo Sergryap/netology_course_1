@@ -51,7 +51,7 @@ class VkAgent(Agent.Social):
         """
         Условие включения группы в отбор
         """
-        with open(os.path.join(os.getcwd(), 'words.txt')) as file:
+        with open(os.path.join(os.getcwd(), 'words.txt'), encoding="utf-8") as file:
             words = [rew.strip().lower() for rew in file.readlines()]
         for rew in words:
             if rew == 'stop':
