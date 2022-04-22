@@ -192,5 +192,5 @@ class Botovod(VkAgent.VkAgent):
 if __name__ == '__main__':
     b1 = Botovod(folder_name='ads_10')
     # b1.get_list_relevant()
-    # b1.get_bot_list('ads_10_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=10000)
-    b1.get_target_audience()
+    b1.get_bot_list('ads_10_users_groups.json', count=500, stop_gr=20, gr=250, min_gr_count=10000)
+    # b1.get_target_audience()
