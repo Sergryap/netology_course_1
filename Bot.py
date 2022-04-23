@@ -98,22 +98,31 @@ class Botovod(VkAgent.VkAgent):
         значения - количество вхождений в группы пользователей
         """
         groups_count = {}
+        groups_count_limit = {}
         not_relevant_groups = self.exclusion_relevant_groups(file_users_groups)
         print('Считаем количество вхождений нерелевантных групп:')
         for groups in not_relevant_groups.values():
             for group in groups['groups']:
                 groups_count[group] = groups_count.get(group, 0) + 1
                 print(f"N{group}={groups_count[group]}")
-        for group, i in groups_count.copy().items():
-            if i < count or self._get_offset(group)[1] > min_gr_count or self.get_count_group(group) > min_gr_count:
+                if groups_count[group] >= count:
+                    groups_count_limit[group] = groups_count[group]
+                    print(f"Update '{group}': {groups_count[group]}")
+
+        j = 0
+        x = len(groups_count_limit)
+        for group, i in groups_count_limit.copy().items():
+            j += 1
+            print(f"{j}/{x}")
+            if self._get_offset(group)[1] > min_gr_count or self.get_count_group(group) > min_gr_count:
                 print(f"Исключаем группу {group}")
-                del groups_count[group]
+                del groups_count_limit[group]
 
         file_groups_count = os.path.join(self.path_ads,
                                          f"{os.path.split(self.path_ads)[1]}_not_relevant_groups_count.json")
         with open(file_groups_count, 'w', encoding="utf-8") as f:
-            json.dump(groups_count, f, indent=2, ensure_ascii=False)
-        return groups_count
+            json.dump(groups_count_limit, f, indent=2, ensure_ascii=False)
+        return groups_count_limit
 
     def get_bot_list(self, file, count=500, stop_gr=30, gr=500, min_gr_count=10000):
         """
@@ -133,13 +142,16 @@ class Botovod(VkAgent.VkAgent):
         file_count = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_not_relevant_groups_count.json")
         with open(file_count, encoding="utf-8") as f:
             count_groups = json.load(f)
-
+        j = 0
+        x = len(all_users)
         for user, groups in all_users.items():
             i = 0
+            j += 1
+            print(f"{j}/{x}")
             for group in groups['groups']:
                 if group in count_groups:
                     i += 1
-            if i >= stop_gr or groups['count'] >= gr or self.friends_info(user) > 1000:
+            if i >= stop_gr or groups['count'] >= gr or self.friends_info(user) > 1500:
                 print(f"{i}/{stop_gr}, {groups['count']}/{gr}")
                 bot_users.append(user)
 
@@ -191,7 +203,7 @@ class Botovod(VkAgent.VkAgent):
 
 
 if __name__ == '__main__':
-    b1 = Botovod(folder_name='ads_11')
+    b1 = Botovod(folder_name='ads_12')
     # b1.get_list_relevant()
-    # b1.get_bot_list('ads_11_users_groups.json', count=500, stop_gr=10, gr=200, min_gr_count=10000)
+    # b1.get_bot_list('ads_12_users_groups.json', count=500, stop_gr=5, gr=300, min_gr_count=20000)
     b1.get_target_audience()
