@@ -51,7 +51,7 @@ class VkAgent(Agent.Social):
         """
         Условие включения группы в отбор
         """
-        with open(os.path.join(os.getcwd(), 'words.txt'), encoding="utf-8") as file:
+        with open(os.path.join(os.getcwd(), 'words.txt')) as file:
             words = [rew.strip().lower() for rew in file.readlines()]
         for rew in words:
             if rew == 'stop':
@@ -414,7 +414,7 @@ def search_ads():
     folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
     print('Выполнить новый поиск групп или использовать ранее выполненный:')
-    i = input('"Y" - новый поиcк, "любой символ" - использовать существующий: ').strip().lower()
+    i = input('"Y" - новый поиcк, "любой символ" - использовать существующий').strip().lower()
     if i == 'y':
         q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
         company.group_search(q=q)
@@ -434,9 +434,9 @@ def search_ads():
 
 
 if __name__ == '__main__':
-    # search_ads()
-    vk1 = VkAgent('ads_11')
-    vk1.get_users_groups()
+    search_ads()
+    # vk1 = VkAgent('ads_10')
+    # vk1.get_users_groups()
     # pprint(vk1.friends_info("6055736"))
 
     # FILE_DIR2 = "Oksa_Studio"
