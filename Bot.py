@@ -86,23 +86,6 @@ class Botovod(VkAgent.VkAgent):
             json.dump(new_users_groups, f, indent=3, ensure_ascii=False)
         return new_users_groups
 
-    @staticmethod
-    def get_count_group(group_id):
-        """Определение количества подписчиков, в том числе, если они скрыты"""
-        url_vk = f"https://vk.com/public{group_id}"
-        headers = {
-            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36"
-        }
-        response = requests.get(url=url_vk, headers=headers)
-        soup = BeautifulSoup(response.text, "lxml")
-        count = soup.find("span", class_="group_friends_count")
-        if count:
-            return int(count.text)
-        count = soup.find("span", class_="header_count")
-        if count:
-            return int(''.join(count.text.split()))
-        return False
-
     def groups_count(self, file_users_groups, count, min_gr_count):
         """
         Подсчет количества вхождений нерелевантных групп в группы пользователей
@@ -122,7 +105,7 @@ class Botovod(VkAgent.VkAgent):
                 groups_count[group] = groups_count.get(group, 0) + 1
                 print(f"N{group}={groups_count[group]}")
         for group, i in groups_count.copy().items():
-            if i < count or self.get_count_group(group) > min_gr_count:
+            if i < count or self._get_offset(group)[1] > min_gr_count or self.get_count_group(group) > min_gr_count:
                 print(f"Исключаем группу {group}")
                 del groups_count[group]
 
@@ -210,5 +193,5 @@ class Botovod(VkAgent.VkAgent):
 if __name__ == '__main__':
     b1 = Botovod(folder_name='ads_11')
     # b1.get_list_relevant()
-    b1.get_bot_list('ads_11_users_groups.json', count=500, stop_gr=10, gr=200, min_gr_count=10000)
-    # b1.get_target_audience()
+    # b1.get_bot_list('ads_11_users_groups.json', count=500, stop_gr=10, gr=200, min_gr_count=10000)
+    b1.get_target_audience()

@@ -5,6 +5,7 @@ import Ya
 import Agent
 import time
 import random as rnd
+from bs4 import BeautifulSoup
 from pprint import pprint
 
 
@@ -51,7 +52,7 @@ class VkAgent(Agent.Social):
         """
         Условие включения группы в отбор
         """
-        with open(os.path.join(os.getcwd(), 'words.txt')) as file:
+        with open(os.path.join(os.getcwd(), 'words.txt'), encoding="utf-8") as file:
             words = [rew.strip().lower() for rew in file.readlines()]
         for rew in words:
             if rew == 'stop':
@@ -72,6 +73,24 @@ class VkAgent(Agent.Social):
         if count == 0:
             return True
         return False
+
+    @staticmethod
+    def get_count_group(group_id):
+        """Определение количества подписчиков, в том числе, если они скрыты"""
+        print(f'Beautifulsoup for {group_id}')
+        url_vk = f"https://vk.com/public{group_id}"
+        headers = {
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36"
+        }
+        response = requests.get(url=url_vk, headers=headers)
+        soup = BeautifulSoup(response.text, "lxml")
+        count = soup.find("span", class_="group_friends_count")
+        if count:
+            return int(count.text)
+        count = soup.find("span", class_="header_count")
+        if count:
+            return int(''.join(count.text.split()))
+        return -1
 
     def group_search(self, q: str, members=50, suffix='groups', verify=True, relevant=False):
         """
@@ -106,6 +125,7 @@ class VkAgent(Agent.Social):
         for group in group_search.copy():
             print(f'+count: id{group}')
             count = self._get_offset(group)[1]
+            count = count if count != -1 else self.get_count_group(group)
             if count < members:
                 del group_search[group]
             else:
@@ -414,7 +434,7 @@ def search_ads():
     folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
     print('Выполнить новый поиск групп или использовать ранее выполненный:')
-    i = input('"Y" - новый поиcк, "любой символ" - использовать существующий').strip().lower()
+    i = input('"Y" - новый поиcк, "любой символ" - использовать существующий: ').strip().lower()
     if i == 'y':
         q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
         company.group_search(q=q)
