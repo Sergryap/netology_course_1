@@ -434,9 +434,9 @@ def search_ads():
 
 
 if __name__ == '__main__':
-    search_ads()
-    # vk1 = VkAgent('ads_10')
-    # vk1.get_users_groups()
+    # search_ads()
+    vk1 = VkAgent('ads_11')
+    vk1.get_users_groups()
     # pprint(vk1.friends_info("6055736"))
 
     # FILE_DIR2 = "Oksa_Studio"
