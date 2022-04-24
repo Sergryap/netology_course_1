@@ -16,7 +16,7 @@ class Botovod(VkAgent.VkAgent):
         super().__init__(folder_name)
         self.list_relevant = ['наращивание ресниц', 'брови', 'маникюр', 'макияж', 'ламинирование', 'красота', 'мода']
 
-    def __groups_relevant(self):
+    def __groups_relevant(self, members=None):
         """
         Поиск релевантных групп по данным списка list_relevant.
         Запись в отдельные json файлы с суффиксами из элементов списка list_relevant
@@ -27,7 +27,7 @@ class Botovod(VkAgent.VkAgent):
                                                                  ',')]
         for q in list_relevant:
             print(f'Поиск по "{q}"')
-            self.group_search(q=q, suffix=f'relevant_{q}', verify=False, relevant=True)
+            self.group_search(members=members, q=q, suffix=f'relevant_{q}', verify=False, relevant=True)
 
     def get_list_relevant(self):
         """
@@ -203,7 +203,7 @@ class Botovod(VkAgent.VkAgent):
 
 
 if __name__ == '__main__':
-    b1 = Botovod(folder_name='ads_12')
-    # b1.get_list_relevant()
-    # b1.get_bot_list('ads_12_users_groups.json', count=500, stop_gr=5, gr=300, min_gr_count=20000)
+    b1 = Botovod(folder_name='ads_14')
+    b1.get_list_relevant()
+    b1.get_bot_list('ads_14_users_groups.json', count=500, stop_gr=10, gr=200, min_gr_count=15000)
     b1.get_target_audience()

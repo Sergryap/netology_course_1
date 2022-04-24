@@ -92,7 +92,7 @@ class VkAgent(Agent.Social):
             return int(''.join(count.text.split()))
         return -1
 
-    def group_search(self, q: str, members=50, suffix='groups', verify=True, relevant=False):
+    def group_search(self, q: str, members=None, suffix='groups', verify=True, relevant=False):
         """
         Поиск групп по ключевой фразе
         :param q: ключевая фраза для поиска
@@ -120,18 +120,20 @@ class VkAgent(Agent.Social):
                 else:
                     break
 
-        # Добавляем количество участников по ключу count
-        # Удаляем группы с числом участкниов менее members
-        for group in group_search.copy():
-            print(f'+count: id{group}')
-            count = self._get_offset(group)[1]
-            count = count if count != -1 else self.get_count_group(group)
-            if count < members:
-                del group_search[group]
-            else:
-                group_search[group]['count'] = count
+        if members:
+            # Добавляем количество участников по ключу count
+            # Удаляем группы с числом участкниов менее members
+            for group in group_search.copy():
+                print(f'+count: id{group}')
+                count = self._get_offset(group)[1]
+                count = count if count != -1 else self.get_count_group(group)
+                if count < members:
+                    del group_search[group]
+                else:
+                    group_search[group]['count'] = count
         path_result = self.path_relevant if relevant else self.path_ads
-        group_result_json = os.path.join(path_result, f"{os.path.split(self.path_ads)[1]}_{suffix}.json")
+        file_name = f"{suffix}.json" if relevant else f"{os.path.split(self.path_ads)[1]}_{suffix}.json"
+        group_result_json = os.path.join(path_result, file_name)
         with open(group_result_json, 'w', encoding="utf-8") as f:
             json.dump(group_search, f, indent=2, ensure_ascii=False)
         return group_search
@@ -431,22 +433,36 @@ class VkAgent(Agent.Social):
 
 
 def search_ads():
+    def set_groups_param(c):
+        words = input('Введите ключевую фразу для поиска групп: ').strip().lower()
+        members = input('Введите минимальное количество членов групп, если нет, то - "N": ').strip().lower()
+        if members.isdigit():
+            c.group_search(members=int(members), q=words)
+        else:
+            c.group_search(q=words)
+
+    def set_users_param(c):
+        print('Введите данные для отбора целевой аудитории:')
+        count = int(input('Состоит не менее чем в N релевантных группах:').strip())
+        month = int(input('Последняя активность не менее N месяцев назад: ').strip())
+        c.get_users(count=count, month=month)
+
     folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
     print('Выполнить новый поиск групп или использовать ранее выполненный:')
     i = input('"Y" - новый поиcк, "любой символ" - использовать существующий: ').strip().lower()
     if i == 'y':
-        q = input('Введите ключевую фразу для поиска аудитории: ').strip().lower()
-        company.group_search(q=q)
+        set_groups_param(c=company)
     elif not os.path.isfile(os.path.join(company.path_ads, f"{os.path.split(company.path_ads)[1]}_groups.json")):
         print('Целевых групп не создано, сначала выполните поиск')
-        q = input('Введите ключевую фразу для поиска групп: ').strip().lower()
-        company.group_search(q=q)
-
-    print('Введите данные для отбора целевой аудитории:')
-    count = int(input('Состоит не менее чем в N релевантных группах:').strip())
-    month = int(input('Последняя активность не менее N месяцев назад: ').strip())
-    company.get_users(count=count, month=month)
+        set_groups_param(c=company)
+    if os.listdir(company.path_users):
+        print('Выполнить новый отбор аудитории или использовать ранее выполненный:')
+        i = input('"Y" - новый, "любой символ" - использовать существующий: ').strip().lower()
+        if i == 'y':
+            set_users_param(company)
+    else:
+        set_users_param(company)
 
     q = input('Выполнить поиск групп пользователей по всем отобранным пользователям ("Y"/"N"): ').strip().lower()
     if q == "y":
