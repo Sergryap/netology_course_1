@@ -7,6 +7,7 @@ import time
 import random as rnd
 from bs4 import BeautifulSoup
 from pprint import pprint
+import sqlite3 as sq
 
 
 class VkAgent(Agent.Social):
@@ -136,7 +137,22 @@ class VkAgent(Agent.Social):
         group_result_json = os.path.join(path_result, file_name)
         with open(group_result_json, 'w', encoding="utf-8") as f:
             json.dump(group_search, f, indent=2, ensure_ascii=False)
-        return group_search
+
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute("DROP TABLE IF EXISTS groups_search")
+            cur.execute("""CREATE TABLE IF NOT EXISTS groups_search (
+                group_id INTEGER,
+                count INTEGER,
+                screen_name TEXT                                        
+                )""")
+            for group_id, value in group_search.items():
+                if members:
+                    cur.execute(
+                        f"INSERT INTO groups_search VALUES({group_id}, {value['count']}, '{value['screen_name']}')")
+                else:
+                    cur.execute(
+                        f"INSERT INTO groups_search (group_id, screen_name, name) VALUES({group_id}, '{value['screen_name']}')")
 
     def _get_offset(self, group_id):
         """
