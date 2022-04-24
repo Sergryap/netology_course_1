@@ -140,8 +140,9 @@ class VkAgent(Agent.Social):
 
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
-            cur.execute("DROP TABLE IF EXISTS groups_search")
-            cur.execute("""CREATE TABLE IF NOT EXISTS groups_search (
+            table_name = suffix if relevant else 'group_search'
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS {table_name} (
                 group_id INTEGER,
                 count INTEGER,
                 screen_name TEXT                                        
@@ -149,10 +150,10 @@ class VkAgent(Agent.Social):
             for group_id, value in group_search.items():
                 if members:
                     cur.execute(
-                        f"INSERT INTO groups_search VALUES({group_id}, {value['count']}, '{value['screen_name']}')")
+                        f"INSERT INTO {table_name} VALUES({group_id}, {value['count']}, '{value['screen_name']}')")
                 else:
                     cur.execute(
-                        f"INSERT INTO groups_search (group_id, screen_name, name) VALUES({group_id}, '{value['screen_name']}')")
+                        f"INSERT INTO {table_name} (group_id, screen_name) VALUES({group_id}, '{value['screen_name']}')")
 
     def _get_offset(self, group_id):
         """
