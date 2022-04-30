@@ -140,7 +140,7 @@ class VkAgent(Agent.Social):
 
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
-            table_name = suffix if relevant else 'group_search'
+            table_name = suffix if relevant else 'groups_search'
             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
             cur.execute(f"""CREATE TABLE IF NOT EXISTS {table_name} (
                 group_id INTEGER,
@@ -214,19 +214,36 @@ class VkAgent(Agent.Social):
         :param city: идентификатор города пользователя
         Результат записывается в файл, готовый к импорту в РК VK
         """
-        group_search_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
-        with open(group_search_json, encoding="utf-8") as f:
-            group_list = json.load(f)
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM groups_search")
+            len_group = len(list(cur))
+            cur.execute("SELECT * FROM groups_search")
+            count_i = 1
+            all_users = []
+            for group in cur:
+                print(f'id{group[0]}_{count_i}/{len_group}')
+                users = self.__get_users(group[0], month=month, sex=sex, city=city)
+                all_users.extend(users)
+                # if count_i == 10:
+                #     break
+                count_i += 1
+        # print(all_users)
+        # time.sleep(30)
 
-        # формируем общий список пользователей, входящих в группы group_list
-        all_users = []
-        len_group = len(group_list)
-        count_i = 1
-        for group in group_list:
-            print(f'id{group}_{count_i}/{len_group}')
-            users = self.__get_users(group, month=month, sex=sex, city=city)
-            all_users.extend(users)
-            count_i += 1
+        # group_search_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
+        # with open(group_search_json, encoding="utf-8") as f:
+        #     group_list = json.load(f)
+        #
+        # # формируем общий список пользователей, входящих в группы group_list
+        # all_users = []
+        # len_group = len(group_list)
+        # count_i = 1
+        # for group in group_list:
+        #     print(f'id{group}_{count_i}/{len_group}')
+        #     users = self.__get_users(group, month=month, sex=sex, city=city)
+        #     all_users.extend(users)
+        #     count_i += 1
 
         # считаем количество подписок каждого пользователя на группы из group_lilst
         count_groups = {}
@@ -243,6 +260,26 @@ class VkAgent(Agent.Social):
         with open(users_file, 'w', encoding="utf-8") as f:
             for item in all_users:
                 f.write(f'{item}\n')
+
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute(f"DROP TABLE IF EXISTS users_list")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS users_list (
+                user_id INTEGER,
+                last_seen_month INTEGER,
+                count_groups INTEGER,
+                city_id INTEGER,
+                sex TEXT,
+                stop_list INTEGER
+                )""")
+            for user, value in count_groups.items():
+                cur.execute(f"""INSERT INTO users_list VALUES(
+                {user},
+                {month}, 
+                {value},
+                {city},
+                '{'female' if sex == 1 else 'male'}',
+                0)""")
 
     def get_user_groups(self, user_id):
         """
@@ -487,8 +524,9 @@ def search_ads():
 
 
 if __name__ == '__main__':
-    search_ads()
-    # vk1 = VkAgent('ads_10')
+    # search_ads()
+    vk1 = VkAgent('ads_15')
+    vk1.get_users()
     # vk1.get_users_groups()
     # pprint(vk1.friends_info("6055736"))
 
