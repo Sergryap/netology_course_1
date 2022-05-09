@@ -143,7 +143,7 @@ class VkAgent(Agent.Social):
             table_name = suffix if relevant else 'groups_search'
             cur.execute(f"DROP TABLE IF EXISTS {table_name}")
             cur.execute(f"""CREATE TABLE IF NOT EXISTS {table_name} (
-                group_id INTEGER,
+                group_id INTEGER PRIMARY KEY,
                 count INTEGER,
                 screen_name TEXT                                        
                 )""")
@@ -265,7 +265,7 @@ class VkAgent(Agent.Social):
             cur = con.cursor()
             cur.execute(f"DROP TABLE IF EXISTS users_list")
             cur.execute(f"""CREATE TABLE IF NOT EXISTS users_list (
-                user_id INTEGER,
+                user_id INTEGER PRIMARY KEY,
                 last_seen_month INTEGER,
                 count_groups INTEGER,
                 city_id INTEGER,
@@ -336,6 +336,22 @@ class VkAgent(Agent.Social):
         for count, user in enumerate(users_list, start=1):
             print(f'{count}/{count_end}: id{user.strip()}')
             user_groups_info = self.get_user_groups(user.strip())
+
+            if user_groups_info[1] != -1:
+                with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+                    cur = con.cursor()
+                    cur.execute(f"""CREATE TABLE IF NOT EXISTS users_groups (
+                        user_id INTEGER,
+                        count INTEGER,
+                        group_id INTEGER
+                        )""")
+                    for group in user_groups_info[0]:
+                        cur.execute(f"""INSERT INTO users_groups VALUES(
+                        {user},
+                        {user_groups_info[1]}, 
+                        {group}
+                        )""")
+
             users_groups[user.strip()] = {'count': user_groups_info[1],
                                           'groups': user_groups_info[0]
                                           }
@@ -524,9 +540,9 @@ def search_ads():
 
 
 if __name__ == '__main__':
-    # search_ads()
-    vk1 = VkAgent('ads_15')
-    vk1.get_users()
+    search_ads()
+    # vk1 = VkAgent('ads_15')
+    # vk1.get_users()
     # vk1.get_users_groups()
     # pprint(vk1.friends_info("6055736"))
 
