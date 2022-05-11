@@ -53,7 +53,7 @@ class VkAgent(Agent.Social):
                 )""")
 
             cur.execute(f"""CREATE TABLE IF NOT EXISTS users_groups (
-                user_id INTEGER PRIMARY KEY,
+                user_id INTEGER,
                 count INTEGER,
                 group_id INTEGER,
                 FOREIGN KEY (user_id) REFERENCES users_list(id)
@@ -300,67 +300,23 @@ class VkAgent(Agent.Social):
         }
         Записывает в файлы по 1000 'user_id' в каждом
         """
-        users_groups = {}
-        user_files = os.listdir(self.path_users)
-        if len(user_files) == 1:
-            n = 1
-        else:
-            for i, user_file in enumerate(user_files, start=1):
-                print(f'{i}: "{user_file}"')
-            n = int(input('Введите номер файл для анализа: ').strip())
-        file_user_list = user_files[n - 1]
-        print('Получаем данные по группам пользователей из файла:')
-        print(file_user_list)
-        # time.sleep(3)
-        with open(os.path.join(self.path_users, file_user_list), encoding="utf-8") as f:
-            users_list = f.readlines()
-        print('Получаем данные:')
-        count_end = len(users_list)
-        for count, user in enumerate(users_list, start=1):
-            print(f'{count}/{count_end}: id{user.strip()}')
-            user_groups_info = self.get_user_groups(user.strip())
-
-            if user_groups_info[1] != -1:
-                with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
-                    cur = con.cursor()
-                    cur.execute(f"""CREATE TABLE IF NOT EXISTS users_groups (
-                        user_id INTEGER,
-                        count INTEGER,
-                        group_id INTEGER
-                        )""")
+        n = int(input('Пользователь состоит не менеее чем в n групп из поиска: ').strip())
+        print('Получаем данные по группам пользователей')
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur1 = con.cursor()
+            all_count = len(list(cur.execute(f"SELECT id FROM users_list WHERE count_groups >= {n}")))
+            cur.execute(f"SELECT id FROM users_list WHERE count_groups >= {n}")
+            for count, user in enumerate(cur, start=1):
+                print(f'{count}/{all_count}_id{user[0]}')
+                user_groups_info = self.get_user_groups(user[0])
+                if user_groups_info[1] != -1:
                     for group in user_groups_info[0]:
-                        cur.execute(f"""INSERT INTO users_groups VALUES(
-                        {user},
+                        cur1.execute(f"""INSERT INTO users_groups VALUES(
+                        {user[0]},
                         {user_groups_info[1]}, 
                         {group}
                         )""")
-
-            users_groups[user.strip()] = {'count': user_groups_info[1],
-                                          'groups': user_groups_info[0]
-                                          }
-            if users_groups[user.strip()]['count'] == -1:
-                del users_groups[user.strip()]
-
-            if count % 1000 == 0 or count == count_end:
-                users_groups_json = os.path.join(self.path_analise,
-                                                 f"{file_user_list.split('.')[0]}_{count}_groups.json")
-                with open(users_groups_json, 'w', encoding="utf-8") as f:
-                    json.dump(users_groups, f, indent=4, ensure_ascii=False)
-                users_groups = {}
-        return self.__union_users_files()
-
-    def __union_users_files(self):
-        """Объединяет файлы с группами пользоватлей в один"""
-        gen_file = (os.path.join(self.path_analise, f) for f in os.listdir(self.path_analise))
-        users_groups = {}
-        for file in gen_file:
-            with open(file, encoding="utf-8") as f:
-                group_list = json.load(f)
-                users_groups.update(group_list)
-        users_groups_file = os.path.join(self.path_ads, f'{os.path.split(self.path_ads)[1]}_users_groups.json')
-        with open(users_groups_file, 'w', encoding="utf-8") as f:
-            json.dump(users_groups, f, indent=4, ensure_ascii=False)
-        return users_groups
 
     def friends_info(self, user_id, count_only=True):
         """Метод friends.get VK"""
