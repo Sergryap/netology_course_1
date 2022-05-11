@@ -27,6 +27,43 @@ class VkAgent(Agent.Social):
             self.path_users = self._folder_creation(self.path_ads, 'users')
             self.path_target = self._folder_creation(self.path_ads, 'target_audience')
 
+    def db_create(self, suffix, relevant):
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute("PRAGMA FOREIGN_KEYS=ON")
+            table_name = suffix if relevant else 'groups_search'
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS {table_name} (
+                id INTEGER PRIMARY KEY,
+                count INTEGER,
+                screen_name TEXT                                        
+                )""")
+
+            cur.execute(f"DROP TABLE IF EXISTS users_list")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS users_list (
+                id INTEGER PRIMARY KEY,
+                last_seen_month INTEGER,
+                count_groups INTEGER,
+                city_id INTEGER,
+                sex TEXT,
+                stop_list INTEGER
+                )""")
+
+            cur.execute(f"DROP TABLE IF EXISTS users_groups")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS users_groups (
+                user_id INTEGER PRIMARY KEY,
+                count INTEGER,
+                group_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users_list(id)
+                )""")
+
+            cur.execute(f"DROP TABLE IF EXISTS groups_search_users")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS groups_search_users (
+                group_search_id INTEGER,
+                user_id INTEGER,
+                FOREIGN KEY (group_search_id) REFERENCES groups_search(id),
+                FOREIGN KEY (user_id) REFERENCES users_list(id)
+                )""")
+
     def __set_params(self, zero=True):
         self.author = 0 if zero else self.author + 1
         print(f'Токен заменен на >>> {self.author}!')
@@ -101,59 +138,38 @@ class VkAgent(Agent.Social):
         :param verify: указывает на необходимость проверки по условию verify_group
         :param relevant: указывается True при поиске релевантных групп
         :param members: минимальное количество участников группы
-        :return: словарь с ключами по id групп, значения словарь с названиями группы и числом участников
         """
-        group_search = {}
-        for soc in ['group', 'page']:
-            offset = 0
-            while True:
-                params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
-                                'offset': offset}
-                response = self.res_stability('groups.search', params_delta)
-                offset += 1
-                if response and response['response']['items']:
-                    for item in response['response']['items']:
-                        print(f"offset={offset}/id{item['id']}")
-                        if verify and self.verify_group(item):
-                            group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
-                        elif not verify:
-                            group_search[item['id']] = {'screen_name': item['screen_name'], 'name': item['name']}
-                else:
-                    break
-
-        if members:
-            # Добавляем количество участников по ключу count
-            # Удаляем группы с числом участкниов менее members
-            for group in group_search.copy():
-                print(f'+count: id{group}')
-                count = self._get_offset(group)[1]
-                count = count if count != -1 else self.get_count_group(group)
-                if count < members:
-                    del group_search[group]
-                else:
-                    group_search[group]['count'] = count
-        path_result = self.path_relevant if relevant else self.path_ads
-        file_name = f"{suffix}.json" if relevant else f"{os.path.split(self.path_ads)[1]}_{suffix}.json"
-        group_result_json = os.path.join(path_result, file_name)
-        with open(group_result_json, 'w', encoding="utf-8") as f:
-            json.dump(group_search, f, indent=2, ensure_ascii=False)
-
+        self.db_create(suffix, relevant)
+        table_name = suffix if relevant else 'groups_search'
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
-            table_name = suffix if relevant else 'groups_search'
-            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
-            cur.execute(f"""CREATE TABLE IF NOT EXISTS {table_name} (
-                group_id INTEGER PRIMARY KEY,
-                count INTEGER,
-                screen_name TEXT                                        
-                )""")
-            for group_id, value in group_search.items():
-                if members:
-                    cur.execute(
-                        f"INSERT INTO {table_name} VALUES({group_id}, {value['count']}, '{value['screen_name']}')")
-                else:
-                    cur.execute(
-                        f"INSERT INTO {table_name} (group_id, screen_name) VALUES({group_id}, '{value['screen_name']}')")
+            for soc in ['group', 'page']:
+                offset = 0
+                while True:
+                    params_delta = {'q': q.lower(), 'type': soc, 'country_id': 1, 'city_id': 110, 'sort': 6,
+                                    'offset': offset}
+                    response = self.res_stability('groups.search', params_delta)
+                    offset += 1
+                    if response and response['response']['items']:
+                        for item in response['response']['items']:
+                            print(f"offset={offset}/id{item['id']}")
+                            if (item['id'],) not in cur.execute(f"SELECT id FROM {table_name}").fetchall():
+                                if verify and self.verify_group(item):
+                                    cur.execute(
+                                        f"INSERT INTO {table_name} (id, screen_name) VALUES({item['id']}, '{item['screen_name']}')")
+                                elif not verify:
+                                    cur.execute(
+                                        f"INSERT INTO {table_name} (id, screen_name) VALUES({item['id']}, '{item['screen_name']}')")
+                    else:
+                        break
+
+            if members:
+                groups = cur.execute(f"SELECT id FROM {table_name}").fetchall()
+                for group in groups:
+                    print(f'+count: id{group[0]}')
+                    count = self._get_offset(group)[1]
+                    count = count if count != -1 else self.get_count_group(group[0])
+                    cur.execute(f"UPDATE {table_name} SET count = {count} WHERE id = {group[0]}")
 
     def _get_offset(self, group_id):
         """
