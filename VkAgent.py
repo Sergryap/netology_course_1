@@ -28,17 +28,21 @@ class VkAgent(Agent.Social):
             self.path_target = self._folder_creation(self.path_ads, 'target_audience')
 
     def db_create(self, suffix, relevant):
+        table_name = suffix if relevant else 'groups_search'
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
             cur.execute("PRAGMA FOREIGN_KEYS=ON")
-            table_name = suffix if relevant else 'groups_search'
+            cur.execute(f"DROP TABLE IF EXISTS groups_search_users")
+            cur.execute(f"DROP TABLE IF EXISTS users_groups")
+            cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+            cur.execute(f"DROP TABLE IF EXISTS users_list")
+
             cur.execute(f"""CREATE TABLE IF NOT EXISTS {table_name} (
                 id INTEGER PRIMARY KEY,
                 count INTEGER,
                 screen_name TEXT                                        
                 )""")
 
-            cur.execute(f"DROP TABLE IF EXISTS users_list")
             cur.execute(f"""CREATE TABLE IF NOT EXISTS users_list (
                 id INTEGER PRIMARY KEY,
                 last_seen_month INTEGER,
@@ -48,7 +52,6 @@ class VkAgent(Agent.Social):
                 stop_list INTEGER
                 )""")
 
-            cur.execute(f"DROP TABLE IF EXISTS users_groups")
             cur.execute(f"""CREATE TABLE IF NOT EXISTS users_groups (
                 user_id INTEGER PRIMARY KEY,
                 count INTEGER,
@@ -56,7 +59,6 @@ class VkAgent(Agent.Social):
                 FOREIGN KEY (user_id) REFERENCES users_list(id)
                 )""")
 
-            cur.execute(f"DROP TABLE IF EXISTS groups_search_users")
             cur.execute(f"""CREATE TABLE IF NOT EXISTS groups_search_users (
                 group_search_id INTEGER,
                 user_id INTEGER,
@@ -150,7 +152,7 @@ class VkAgent(Agent.Social):
                                     'offset': offset}
                     response = self.res_stability('groups.search', params_delta)
                     offset += 1
-                    if response and response['response']['items']:
+                    if response and response['response']['items'] and offset < 10:
                         for item in response['response']['items']:
                             print(f"offset={offset}/id{item['id']}")
                             if (item['id'],) not in cur.execute(f"SELECT id FROM {table_name}").fetchall():
@@ -218,13 +220,12 @@ class VkAgent(Agent.Social):
                     if 'last_seen' in item and item['last_seen']['time'] >= time_start and item['sex'] == sex:
                         if 'city' in item and item['city']['id'] == city:
                             good_id_list.append(item['id'])
-        return good_id_list
+        return list(set(good_id_list))
 
-    def get_users(self, count=2, month=4, sex=1, city=110):
+    def get_users(self, month=4, sex=1, city=110):
         """
         Создание списка из id подписчиков групп из файла с id групп
         Подписчики состоят не менее чем в количестве count группах
-        :param count: минимальное количество групп в которых состоит подписчик
         :param month: активностm пользователя не менее месяцев назад
         :param sex: пол подписчика (по умолчанию жен)
         :param city: идентификатор города пользователя
@@ -234,60 +235,26 @@ class VkAgent(Agent.Social):
             cur = con.cursor()
             cur.execute("SELECT * FROM groups_search")
             len_group = len(list(cur))
-            cur.execute("SELECT * FROM groups_search")
+            groups = cur.execute("SELECT id FROM groups_search").fetchall()
             count_i = 1
-            all_users = []
-            for group in cur:
+            for group in groups:
                 print(f'id{group[0]}_{count_i}/{len_group}')
                 users = self.__get_users(group[0], month=month, sex=sex, city=city)
-                all_users.extend(users)
-                # if count_i == 10:
-                #     break
+                for user in users:
+                    cur.execute(f"INSERT INTO groups_search_users VALUES({group[0]}, {user})")
                 count_i += 1
-        # print(all_users)
-        # time.sleep(30)
 
-        # group_search_json = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_groups.json")
-        # with open(group_search_json, encoding="utf-8") as f:
-        #     group_list = json.load(f)
-        #
-        # # формируем общий список пользователей, входящих в группы group_list
-        # all_users = []
-        # len_group = len(group_list)
-        # count_i = 1
-        # for group in group_list:
-        #     print(f'id{group}_{count_i}/{len_group}')
-        #     users = self.__get_users(group, month=month, sex=sex, city=city)
-        #     all_users.extend(users)
-        #     count_i += 1
-
-        # считаем количество подписок каждого пользователя на группы из group_lilst
-        count_groups = {}
-        for user in all_users:
-            count_groups[user] = count_groups.get(user, 0) + 1
-        all_users = []
-        for user, value in count_groups.items():
-            if value >= count:
-                all_users.append(user)
-        # записываем полученные данные в файл
-        male = 'female' if sex == 1 else 'male'
-        users_file = os.path.join(self.path_users,
-                                  f"{os.path.split(self.path_ads)[1]}_users_{count}_groups_{month}_month_{male}_sex_{city}_city.txt")
-        with open(users_file, 'w', encoding="utf-8") as f:
-            for item in all_users:
-                f.write(f'{item}\n')
-
+        # считаем количество подписок каждого пользователя на группы из groups_search
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
-            cur.execute(f"DROP TABLE IF EXISTS users_list")
-            cur.execute(f"""CREATE TABLE IF NOT EXISTS users_list (
-                user_id INTEGER PRIMARY KEY,
-                last_seen_month INTEGER,
-                count_groups INTEGER,
-                city_id INTEGER,
-                sex TEXT,
-                stop_list INTEGER
-                )""")
+            cur.execute("SELECT user_id FROM groups_search_users")
+            count_groups = {}
+            for user in cur:
+                count_groups[user[0]] = count_groups.get(user[0], 0) + 1
+
+        # записываем полученные данные
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
             for user, value in count_groups.items():
                 cur.execute(f"""INSERT INTO users_list VALUES(
                 {user},
@@ -529,9 +496,8 @@ def search_ads():
 
     def set_users_param(c):
         print('Введите данные для отбора целевой аудитории:')
-        count = int(input('Состоит не менее чем в N релевантных группах:').strip())
         month = int(input('Последняя активность не менее N месяцев назад: ').strip())
-        c.get_users(count=count, month=month)
+        c.get_users(month=month)
 
     folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
