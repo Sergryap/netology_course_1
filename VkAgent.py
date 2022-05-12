@@ -15,17 +15,18 @@ class VkAgent(Agent.Social):
     with open(os.path.join(os.getcwd(), "Token.txt"), encoding='utf-8') as file:
         token = [t.strip() for t in file.readlines()]
 
-    def __init__(self, folder_name=None, tok=token[0]):
+    def __init__(self, folder_name, last_seen=2, count_groups=2, tok=token[0]):
         self.params = {'access_token': tok, 'v': '5.131'}
         self.author = 0
-        if folder_name:
-            self.folder_name = folder_name
-            self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
-            self.path_analise = self._folder_creation(self.path_ads, 'users_groups')
-            self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
-            self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
-            self.path_users = self._folder_creation(self.path_ads, 'users')
-            self.path_target = self._folder_creation(self.path_ads, 'target_audience')
+        self.last_seen = last_seen
+        self.count_groups = count_groups
+        self.folder_name = folder_name
+        self.path_ads = self._folder_creation((self._folder_creation(os.getcwd(), 'VK_ads')), folder_name)
+        self.path_analise = self._folder_creation(self.path_ads, 'users_groups')
+        self.path_relevant = self._folder_creation(self.path_ads, 'groups_relevant')
+        self.path_bot = self._folder_creation(self.path_ads, 'users_bot')
+        self.path_users = self._folder_creation(self.path_ads, 'users')
+        self.path_target = self._folder_creation(self.path_ads, 'target_audience')
 
     def db_create(self, suffix, relevant):
         table_name = suffix if relevant else 'groups_search'
@@ -152,7 +153,7 @@ class VkAgent(Agent.Social):
                                     'offset': offset}
                     response = self.res_stability('groups.search', params_delta)
                     offset += 1
-                    if response and response['response']['items'] and offset < 10:
+                    if response and response['response']['items'] and offset < 6:
                         for item in response['response']['items']:
                             print(f"offset={offset}/id{item['id']}")
                             if (item['id'],) not in cur.execute(f"SELECT id FROM {table_name}").fetchall():
@@ -197,11 +198,10 @@ class VkAgent(Agent.Social):
             return response['response'][0]['is_closed']
         return -1, -1
 
-    def __get_users(self, group_id, month, sex, city):
+    def __get_users(self, group_id, sex, city):
         """
         Создание списка из id подписчиков группы
         :param group_id: id группы, у которой отбираем подписчиков
-        :param month: количество месяцев с последнего посещения участника группы
         :param sex: пол участника группы для отбора в список
         return: список участников группы
         """
@@ -216,17 +216,15 @@ class VkAgent(Agent.Social):
             if response:
                 offset += 1
                 for item in response['response']['items']:
-                    time_start = round(time.time()) - round(month * 30.42 * 86400)
+                    time_start = round(time.time()) - round(self.last_seen * 30.42 * 86400)
                     if 'last_seen' in item and item['last_seen']['time'] >= time_start and item['sex'] == sex:
                         if 'city' in item and item['city']['id'] == city:
                             good_id_list.append(item['id'])
         return list(set(good_id_list))
 
-    def get_users(self, month=4, sex=1, city=110):
+    def get_users(self, sex=1, city=110):
         """
         Создание списка из id подписчиков групп из файла с id групп
-        Подписчики состоят не менее чем в количестве count группах
-        :param month: активностm пользователя не менее месяцев назад
         :param sex: пол подписчика (по умолчанию жен)
         :param city: идентификатор города пользователя
         Результат записывается в файл, готовый к импорту в РК VK
@@ -239,27 +237,38 @@ class VkAgent(Agent.Social):
             count_i = 1
             for group in groups:
                 print(f'id{group[0]}_{count_i}/{len_group}')
-                users = self.__get_users(group[0], month=month, sex=sex, city=city)
+                users = self.__get_users(group[0], sex=sex, city=city)
                 for user in users:
                     cur.execute(f"INSERT INTO groups_search_users VALUES({group[0]}, {user})")
                 count_i += 1
 
         # считаем количество подписок каждого пользователя на группы из groups_search
+        # with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+        #     cur = con.cursor()
+        #     cur.execute("SELECT user_id FROM groups_search_users")
+        #     count_groups = {}
+        #     for user in cur:
+        #         count_groups[user[0]] = count_groups.get(user[0], 0) + 1
+
+        # считаем количество подписок каждого пользователя на группы из groups_search
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
-            cur.execute("SELECT user_id FROM groups_search_users")
-            count_groups = {}
-            for user in cur:
-                count_groups[user[0]] = count_groups.get(user[0], 0) + 1
+            cur.execute(f"""
+                SELECT user_id, COUNT(user_id) AS count                
+                FROM groups_search_users
+                GROUP BY user_id
+                ORDER BY count                
+                """)
+            count_groups = cur.fetchall()
 
         # записываем полученные данные
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
-            for user, value in count_groups.items():
+            for user in count_groups:
                 cur.execute(f"""INSERT INTO users_list VALUES(
-                {user},
-                {month}, 
-                {value},
+                {user[0]},
+                {self.last_seen}, 
+                {user[1]},
                 {city},
                 '{'female' if sex == 1 else 'male'}',
                 0)""")
@@ -348,98 +357,6 @@ class VkAgent(Agent.Social):
                 return friends_info
         return -1
 
-    def __albums_id(self, owner_id):
-        """
-        Cоздает список словарей, содержащих название и id
-        альбомы пользователя
-        """
-        params_delta = {'owner_id': owner_id, 'need_system': '1'}
-        response = self.res_stability('photos.getAlbums', params_delta)
-        if response:
-            albums_id = []
-            for item in response['response']['items']:
-                albums_id.append({
-                    'title': self._path_normalizer(item['title']),
-                    'id': item['id']
-                })
-            return albums_id
-        return -1, -1
-
-    @staticmethod
-    def __get_items(item: dict):
-        """
-        Находим фото с наибольшим разрешением.
-        Если данных по размерам нет, то принимаем по size['type']
-        """
-        area = 0
-        for size in item['sizes']:
-            if size['height'] and size['width'] and size['height'] > 0 and size['width'] > 0:
-                if size['height'] * size['width'] > area:
-                    area = size['height'] * size['width']
-                    image_res = f"{size['height']} * {size['width']}"
-                    photo_url = size['url']
-            else:
-                flag = False
-                for i in 'wzyx':
-                    for size1 in item['sizes']:
-                        if size1['type'] == i:
-                            image_res = "нет данных"
-                            photo_url = size1['url']
-                            flag = True
-                            break
-                    if flag:
-                        break
-                break
-        return image_res, photo_url
-
-    def __photos_get(self, owner_id, album_id):
-        """Создает список для метода photos_info"""
-        params_delta = {'owner_id': owner_id, 'album_id': album_id, 'extended': 1}
-        response = self.res_stability('photos.get', params_delta)
-        if response:
-            photos_info = []
-            file_names_count = {}
-            for item in response['response']['items']:
-                image_resolution = self.__get_items(item)[0]
-                photo_url = self.__get_items(item)[1]
-                likes = item['likes']['count']
-                file_name = str(likes)
-                # Создаем словарь типа {количество лайков: количество одинаковых количеств лайков}
-                file_names_count[file_name] = file_names_count.get(file_name, 0) + 1
-                # Добавляем словарь в список photos_info
-                photos_info.append({
-                    'file_name': file_name,
-                    'date': item['date'],
-                    'url': photo_url,
-                    'size': image_resolution
-                })
-                # Преобразовываем полученный ранее список photos_info:
-                # добавляем расширение и при необходимости дату к имени файла
-                # на основании данных словаря file_names_count
-                # удаляем дату из словарей
-            for photo in photos_info:
-                if file_names_count[photo['file_name']] > 1:
-                    photo['file_name'] += f"_{photo['date']}.jpg"
-                else:
-                    photo['file_name'] += ".jpg"
-                del photo['date']
-            return photos_info
-        return -1, -1
-
-    def photos_info(self, owner_id):
-        """
-        Создает словарь типа:
-        {'название альбома':
-        [{'file_name': file_name, 'url': photo_url, 'size': image_resolution}...]
-        Метод ВК: photos.get:
-        """
-        total_photos_info = {}
-        for album_id in self.__albums_id(owner_id):
-            print(f"Получаем данные из альбома: {album_id['title']}")
-            # time.sleep(rnd.randint(1, 5))
-            total_photos_info[album_id['title']] = self.__photos_get(owner_id, album_id['id'])
-        return total_photos_info
-
 
 def search_ads():
     def set_groups_param(c):
@@ -450,27 +367,23 @@ def search_ads():
         else:
             c.group_search(q=words)
 
-    def set_users_param(c):
-        print('Введите данные для отбора целевой аудитории:')
-        month = int(input('Последняя активность не менее N месяцев назад: ').strip())
-        c.get_users(month=month)
-
     folder_name = input(f'Введите название нового проекта либо существующего: ').strip()
     company = VkAgent(folder_name)
     print('Выполнить новый поиск групп или использовать ранее выполненный:')
     i = input('"Y" - новый поиcк, "любой символ" - использовать существующий: ').strip().lower()
     if i == 'y':
         set_groups_param(c=company)
-    elif not os.path.isfile(os.path.join(company.path_ads, f"{os.path.split(company.path_ads)[1]}_groups.json")):
+    elif not os.path.isfile(os.path.join(company.path_ads, "social_agent.db")):
         print('Целевых групп не создано, сначала выполните поиск')
         set_groups_param(c=company)
+
     if os.listdir(company.path_users):
         print('Выполнить новый отбор аудитории или использовать ранее выполненный:')
         i = input('"Y" - новый, "любой символ" - использовать существующий: ').strip().lower()
         if i == 'y':
-            set_users_param(company)
+            company.get_users()
     else:
-        set_users_param(company)
+        company.get_users()
 
     q = input('Выполнить поиск групп пользователей по всем отобранным пользователям ("Y"/"N"): ').strip().lower()
     if q == "y":
