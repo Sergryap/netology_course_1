@@ -8,6 +8,7 @@ import time
 import random as rnd
 from bs4 import BeautifulSoup
 from pprint import pprint
+import sqlite3 as sq
 
 
 class Botovod(VkAgent.VkAgent):
@@ -15,8 +16,31 @@ class Botovod(VkAgent.VkAgent):
     def __init__(self, folder_name):
         super().__init__(folder_name)
         self.list_relevant = ['наращивание ресниц', 'брови', 'маникюр', 'макияж', 'ламинирование', 'красота', 'мода']
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS
+                groups_search_relevant (
+                id INTEGER PRIMARY KEY,
+                count INTEGER,
+                screen_name VARCHAR(50)                                        
+                )""")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS
+                users_groups_not_relevant (
+                user_id INTEGER,
+                count INTEGER,
+                group_id INTEGER                                        
+                )""")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS
+                count_groups_not_relevant (
+                group_id INTEGER PRIMARY KEY,
+                count INTEGER                                                        
+                )""")
+            cur.execute(f"""CREATE TABLE IF NOT EXISTS
+                bot_users (
+                user_id INTEGER                                                                       
+                )""")
 
-    def __groups_relevant(self, members=None):
+    def groups_relevant(self, members=None):
         """
         Поиск релевантных групп по данным списка list_relevant.
         Запись в отдельные json файлы с суффиксами из элементов списка list_relevant
@@ -25,141 +49,114 @@ class Botovod(VkAgent.VkAgent):
         list_relevant = self.list_relevant if i == 'y' else [q.strip().lower() for q in
                                                              input(f"Введите ваш список фраз через запятую: ").split(
                                                                  ',')]
-        for q in list_relevant:
-            print(f'Поиск по "{q}"')
-            self.group_search(members=members, q=q, suffix=f'relevant_{q}', verify=False, relevant=True)
+        for word in list_relevant:
+            print(f'Поиск по "{word}"')
+            self.group_search(members=members, suffix=f'relevant_{word}', verify=False, relevant=True,
+                              word_relevant=word)
 
     def get_list_relevant(self):
         """
-        Создание списка релевантных групп по всем элементам self.list_relevant
-        c объединением в один файл txt
-        :return: group_list
+        Создание общей таблицы релевантных групп по всем таблицам релевантных групп
+        c объединением в одну таблицу
         """
-        self.__groups_relevant()
-        gen_file = (os.path.join(self.path_relevant, file) for file in os.listdir(self.path_relevant) if
-                    os.path.isfile(os.path.join(self.path_relevant, file)) and '.json' in file)
-        groups_list = []
-        for file in gen_file:
-            with open(file, encoding="utf-8-sig") as f:
-                groups_list.extend(json.load(f).keys())
-        groups_list = list(set(groups_list))
-        file_list_relevant = os.path.join(self.path_relevant,
-                                          f"{os.path.split(self.path_ads)[1]}_relevant.txt")
-        with open(file_list_relevant, 'w', encoding="utf-8") as f:
-            for group in groups_list:
-                f.write(f'{group}\n')
-        return groups_list
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            table_name = (f"relevant_{'_'.join(rew.strip().split())}" for rew in self.list_relevant)
+            for table in table_name:
+                cur.execute(f"""
+                    INSERT INTO groups_search_prev (id, screen_name)
+                    SELECT id, screen_name                  
+                    FROM {table}                
+                    """)
+            cur.execute(f"DELETE FROM groups_search_relevant")
+            cur.execute(f"""
+                INSERT INTO count_groups_not_relevant (id, screen_name)
+                SELECT id, screen_name                  
+                FROM groups_search_prev
+                GROUP BY id, screen_name
+                ORDER BY id
+                """)
+            cur.execute(f"""
+                DELETE FROM groups_search_prev
+                """)
 
-    def exclusion_relevant_groups(self, file_users_groups: str):
+    def exclusion_relevant_groups(self):
         """
-        Исключаем из словаря со значениями из групп пользователя
-        релевантные группы, созданные в get_list_relevant
-        :param file_users_groups: json файл со словарем:
-        ключи - id пользователя,
-        значения - {'groups': список групп пользователя, "count': количество участников}
-        :return: словарь, в котором ключи - id пользователя,
-        значения - списки нерелевантных групп
+        Исключаем из 'users_groups' релевантные группы
+        из 'groups_search_relevant' по каждому пользователю
+        Записываем в таблицу 'users_groups_not_relevant'
         """
-        new_users_groups = {}
-        file = os.path.join(self.path_ads, file_users_groups)
-        with open(file, encoding="utf-8") as f:
-            all_users_group = json.load(f)
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute(f"DELETE FROM users_groups_not_relevant")
+            cur.execute(f"""
+                INSERT INTO users_groups_not_relevant
+                SELECT user_id, count, group_id                  
+                FROM users_groups
+                WHERE group_id NOT IN (
+                SELECT id
+                FROM groups_search_relevant)
+                """)
 
-        file_list_relevant = os.path.join(self.path_relevant, f"{os.path.split(self.path_ads)[1]}_relevant.txt")
-        with open(file_list_relevant, encoding="utf-8") as f:
-            delta_groups = f.readlines()
-        delta_groups = set([f.strip() for f in delta_groups])
-
-        # Приводим к строковому типу значения id групп в all_users_group
-        for user, groups in all_users_group.items():
-            all_users_group[user] = {'count': groups['count'],
-                                     'groups': [str(group) for group in groups['groups']]}
-
-        for key, value in all_users_group.items():
-            print(key)
-            new_value = {'count': value['count'],
-                         'groups': list(set(value['groups']) - delta_groups)}
-            new_users_groups[key] = new_value
-
-        file_no_relevant = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_not_relevant.json")
-        with open(file_no_relevant, 'w', encoding="utf-8") as f:
-            json.dump(new_users_groups, f, indent=3, ensure_ascii=False)
-        return new_users_groups
-
-    def groups_count(self, file_users_groups, count, min_gr_count):
+    def groups_count(self, count, min_gr_count):
         """
         Подсчет количества вхождений нерелевантных групп в группы пользователей
-        :param file_users_groups: json файл со словарем:
-        ключи - id пользователя,
-        значения - {'groups': список групп пользователя, "count': количество участников}
-        :param count: минимальное учитываемое количество вхождений группы
-        :param min_gr_count: число участников группы, при меньшем значении группа относится к исключаемой
-        :return: словарь ключи - id групп
-        значения - количество вхождений в группы пользователей
         """
-        groups_count = {}
-        groups_count_limit = {}
-        not_relevant_groups = self.exclusion_relevant_groups(file_users_groups)
-        print('Считаем количество вхождений нерелевантных групп:')
-        for groups in not_relevant_groups.values():
-            for group in groups['groups']:
-                groups_count[group] = groups_count.get(group, 0) + 1
-                print(f"N{group}={groups_count[group]}")
-                if groups_count[group] >= count:
-                    groups_count_limit[group] = groups_count[group]
-                    print(f"Update '{group}': {groups_count[group]}")
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute(f"DELETE FROM count_groups_not_relevant")
+            cur.execute(f"""
+            INSERT INTO count_groups_not_relevant            
+            SELECT group_id, count(*) AS n
+            FROM users_groups_not_relevant
+            GROUP BY 1
+            HAVING n >= {count}
+            ORDER BY n
+            """)
+            gen = list(cur.execute("""SELECT group_id
+                      FROM count_groups_not_relevant 
+                      """))
+            for group in gen:
+                if self._get_offset(group[0])[1] > min_gr_count or self.get_count_group(group[0]) > min_gr_count:
+                    print(f"Исключаем группу {group[0]}")
+                    cur.execute(f"""
+                        DELETE FROM count_groups_not_relevant
+                        WHERE group_id = {group[0]}
+                        """)
 
-        j = 0
-        x = len(groups_count_limit)
-        for group, i in groups_count_limit.copy().items():
-            j += 1
-            print(f"{j}/{x}")
-            if self._get_offset(group)[1] > min_gr_count or self.get_count_group(group) > min_gr_count:
-                print(f"Исключаем группу {group}")
-                del groups_count_limit[group]
-
-        file_groups_count = os.path.join(self.path_ads,
-                                         f"{os.path.split(self.path_ads)[1]}_not_relevant_groups_count.json")
-        with open(file_groups_count, 'w', encoding="utf-8") as f:
-            json.dump(groups_count_limit, f, indent=2, ensure_ascii=False)
-        return groups_count_limit
-
-    def get_bot_list(self, file, count=500, stop_gr=30, gr=500, min_gr_count=10000):
+    def get_bot_list(self, gr=500, stop_gr=10):
         """
         Создание списка ботов
-        :param stop_gr: количество вхождений нерелевантных групп из groups_count
+        :param stop_gr: допустимое количество вхождений нерелевантных групп из groups_count
         :param gr: допустимое количество групп у пользователя
-        :param file: файл для groups_count
-        :param count: count для groups_count
-        :param min_gr_count: число участников группы, при меньшем значении группа относится к исключаемой
-        в группы пользователей, при котором пользователь относится к боту
         """
-        self.groups_count(file_users_groups=file, count=count, min_gr_count=min_gr_count)
-        bot_users = []
-        file_users = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_not_relevant.json")
-        with open(file_users, encoding="utf-8") as f:
-            all_users = json.load(f)
-        file_count = os.path.join(self.path_ads, f"{os.path.split(self.path_ads)[1]}_not_relevant_groups_count.json")
-        with open(file_count, encoding="utf-8") as f:
-            count_groups = json.load(f)
-        j = 0
-        x = len(all_users)
-        for user, groups in all_users.items():
-            i = 0
-            j += 1
-            print(f"{j}/{x}")
-            for group in groups['groups']:
-                if group in count_groups:
-                    i += 1
-            if i >= stop_gr or groups['count'] >= gr or self.friends_info(user) > 1500:
-                print(f"{i}/{stop_gr}, {groups['count']}/{gr}")
-                bot_users.append(user)
-
-        file_bot = os.path.join(self.path_bot,
-                                f"{os.path.split(self.path_ads)[1]}_bot_users_count_{count}_stop_gr_{stop_gr}_gr_{gr}_min_{min_gr_count}.txt")
-        with open(file_bot, 'w', encoding="utf-8") as f:
-            for user in bot_users:
-                f.write(f'{user}\n')
+        with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
+            cur = con.cursor()
+            cur.execute(f"DELETE FROM bot_users")
+            cur.execute(f"""
+                INSERT INTO bot_users
+                SELECT user_id
+                FROM users_groups_not_relevant                
+                WHERE group_id IN (
+                  SELECT group_id
+                  FROM count_groups_not_relevant)                                  
+                GROUP BY user_id
+                HAVING count(*) > {stop_gr}
+                UNION
+                SELECT DISTINCT user_id
+                FROM users_groups_not_relevant
+                WHERE count >= {gr}
+                """)
+            users_list = list(cur.execute("""
+                                 SELECT DISTINCT user_id
+                                 FROM users_groups_not_relevant
+                                 WHERE user_id NOT IN (
+                                 SELECT user_id
+                                 FROM bot_users)  
+                                 """))
+            for user in users_list:
+                if self.friends_info(user[0]) > 1500:
+                    cur.execute(f'INSERT INTO bot_users VALUES ({user[0]})')
 
     def get_target_audience(self):
         """Получение списка пользователей, очищенного от нежелательных пользователей"""
@@ -203,7 +200,11 @@ class Botovod(VkAgent.VkAgent):
 
 
 if __name__ == '__main__':
-    b1 = Botovod(folder_name='ads_15')
-    b1.get_list_relevant()
+    b1 = Botovod(folder_name='ads_21')
+    b1.get_bot_list()
+    # b1.groups_count(300, 15000)
+    # b1.exclusion_relevant_groups()
+    # b1.groups_relevant()
+    # b1.get_list_relevant()
     # b1.get_bot_list('ads_14_users_groups.json', count=500, stop_gr=10, gr=200, min_gr_count=15000)
     # b1.get_target_audience()

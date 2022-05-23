@@ -26,7 +26,7 @@ class VkAgent(Agent.Social):
         self.path_target = self._folder_creation(self.path_ads, 'target_audience')
 
     def db_create(self, suffix, relevant):
-        table_name = suffix if relevant else 'groups_search'
+        table_name = '_'.join(suffix.strip().split()) if relevant else 'groups_search'
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
             if not relevant:
@@ -37,6 +37,8 @@ class VkAgent(Agent.Social):
                 cur.execute(f"DROP TABLE IF EXISTS users_groups")
                 cur.execute(f"DROP TABLE IF EXISTS {table_name}")
                 cur.execute(f"DROP TABLE IF EXISTS users_list")
+            else:
+                cur.execute(f"DROP TABLE IF EXISTS {table_name}")
 
             cur.execute(f"""CREATE TABLE IF NOT EXISTS groups_search_prev (
                 id INTEGER,                
@@ -138,18 +140,22 @@ class VkAgent(Agent.Social):
             return int(''.join(count.text.split()))
         return -1
 
-    def group_search(self, members=None, suffix='groups', verify=True, relevant=False):
+    def group_search(self, members=None, suffix='groups', verify=True, relevant=False, word_relevant=None):
         """
         Поиск групп по ключевой фразе
         :param suffix: суффикс для создаваемого итогового файла
         :param verify: указывает на необходимость проверки по условию verify_group
         :param relevant: указывается True при поиске релевантных групп
         :param members: минимальное количество участников группы
+        :param word_relevant: релевантная фраза при поиске релевантных групп
         """
         self.db_create(suffix, relevant)
-        with open(os.path.join(os.getcwd(), 'words.txt'), encoding="utf-8") as file:
-            q = file.readline().strip()
-        table_name = suffix if relevant else 'groups_search'
+        if not relevant:
+            with open(os.path.join(os.getcwd(), 'words.txt'), encoding="utf-8") as file:
+                q = file.readline().strip()
+        elif word_relevant:
+            q = word_relevant
+        table_name = '_'.join(suffix.strip().split()) if relevant else 'groups_search'
         with sq.connect(os.path.join(self.path_ads, "social_agent.db")) as con:
             cur = con.cursor()
             for soc in ['group', 'page']:
